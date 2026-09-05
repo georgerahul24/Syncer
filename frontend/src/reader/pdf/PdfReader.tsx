@@ -10,12 +10,6 @@ import PdfSearchOverlay from './PdfSearchOverlay';
 import type { PdfSearchMatch } from './search';
 import styles from './PdfReader.module.css';
 
-// Horizontal/vertical space PdfReader.module.css's .scrollArea padding
-// takes up — subtracted when fitting a page to the available area. Kept
-// as constants rather than measured, since re-measuring after every layout
-// pass would be more complexity than a page being ~1% off is worth.
-const H_PADDING = 48;
-const V_PADDING = 96;
 const PRELOAD_MARGIN = '1200px 0px';
 
 export default function PdfReader({
@@ -125,12 +119,12 @@ export default function PdfReader({
 
   const scale = useMemo(() => {
     if (!basePageSize) return 1;
-    const availWidth = Math.max(200, Math.min(containerSize.width - H_PADDING, settings.readingWidth));
-    const availHeight = Math.max(200, containerSize.height - V_PADDING);
+    const availWidth = Math.max(200, containerSize.width - settings.padding.left - settings.padding.right);
+    const availHeight = Math.max(200, containerSize.height - settings.padding.top - settings.padding.bottom);
     if (settings.pdfZoom === 'fit-width') return availWidth / basePageSize.width;
     if (settings.pdfZoom === 'fit-page') return availHeight / basePageSize.height;
     return typeof settings.pdfZoom === 'number' ? settings.pdfZoom : 1;
-  }, [basePageSize, containerSize, settings.pdfZoom, settings.readingWidth]);
+  }, [basePageSize, containerSize, settings.pdfZoom, settings.padding]);
 
   const placeholderWidth = basePageSize ? basePageSize.width * scale : 0;
   const placeholderHeight = basePageSize ? basePageSize.height * scale : 0;
@@ -191,26 +185,24 @@ export default function PdfReader({
 
     function computeCurrentPage() {
       ticking = false;
-      const containerTop = scrollArea!.getBoundingClientRect().top;
-      // "Current page" = the page whose top edge is at or just above the
-      // container's own top edge (i.e. the page currently filling the top
-      // of the view) — among active pages satisfying that, the one closest
-      // to 0. THRESHOLD_PX gives a little slack so the page doesn't flip
-      // to the next one until it's meaningfully scrolled past the top.
-      const THRESHOLD_PX = 120;
-      let best: { page: number; top: number } | null = null;
-      let topmostOverall: { page: number; top: number } | null = null;
+      // "Current page" = whichever active page occupies the most vertical
+      // space in the viewport right now — NOT "the first page whose top
+      // has scrolled past some threshold". The old threshold approach
+      // would call a page "current" the instant even a sliver of it
+      // touched the top of the view, so a barely-visible page (a couple
+      // pixels peeking in at the bottom of the screen) could get synced
+      // as the reading position. Ranking by visible height instead means
+      // the page filling most of the screen always wins, which is what
+      // "where the user is actually reading" should mean.
+      const containerRect = scrollArea!.getBoundingClientRect();
+      let best: { page: number; visible: number } | null = null;
       for (const page of activePages) {
         const el = nodesRef.current.get(page);
         if (!el) continue;
-        const top = el.getBoundingClientRect().top - containerTop;
-        if (!topmostOverall || top < topmostOverall.top) topmostOverall = { page, top };
-        if (top <= THRESHOLD_PX && (!best || top > best.top)) best = { page, top };
+        const rect = el.getBoundingClientRect();
+        const visible = Math.max(0, Math.min(rect.bottom, containerRect.bottom) - Math.max(rect.top, containerRect.top));
+        if (visible > 0 && (!best || visible > best.visible)) best = { page, visible };
       }
-      // Fallback for when nothing qualifies (e.g. the very first page hasn't
-      // scrolled up to the threshold yet) — use whichever active page is
-      // topmost, even if that's below the threshold.
-      best = best ?? topmostOverall;
       if (best && best.page !== currentPage) {
         setCurrentPage(best.page);
         if (suppressRef.current) {
@@ -381,7 +373,12 @@ export default function PdfReader({
       {!ready && <div className={styles.centered}>Opening book…</div>}
 
       {ready && settings.mode === 'continuous' && (
-        <div ref={scrollAreaRef} className={styles.scrollArea} onMouseMove={onActivity}>
+        <div
+          ref={scrollAreaRef}
+          className={styles.scrollArea}
+          style={{ padding: `${settings.padding.top}px ${settings.padding.right}px ${settings.padding.bottom}px ${settings.padding.left}px` }}
+          onMouseMove={onActivity}
+        >
           <div className={styles.pageList}>
             {Array.from({ length: numPages }, (_, i) => i + 1).map((page) => (
               <PdfPage
@@ -405,7 +402,11 @@ export default function PdfReader({
       )}
 
       {ready && settings.mode === 'paginated' && (
-        <div className={styles.paginatedViewport} onMouseMove={onActivity}>
+        <div
+          className={styles.paginatedViewport}
+          style={{ padding: `${settings.padding.top}px ${settings.padding.right}px ${settings.padding.bottom}px ${settings.padding.left}px` }}
+          onMouseMove={onActivity}
+        >
           <PdfPage
             key={currentPage}
             doc={doc!}

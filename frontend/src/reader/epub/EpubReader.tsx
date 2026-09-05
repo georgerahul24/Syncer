@@ -311,7 +311,7 @@ export default function EpubReader({
   useEffect(() => {
     if (!ready || !renditionRef.current) return;
     applyAppearance(renditionRef.current, settings);
-  }, [ready, settings.theme, settings.fontFamily, settings.fontSize, settings.lineHeight, settings.margin, settings.readingWidth]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [ready, settings.theme, settings.fontFamily, settings.fontSize, settings.lineHeight, settings.padding]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!outlineTarget || !renditionRef.current) return;

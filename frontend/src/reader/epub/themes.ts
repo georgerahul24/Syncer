@@ -31,9 +31,8 @@ export function applyAppearance(rendition: Rendition, settings: ReaderSettings):
   rendition.themes.font(FONT_STACKS[settings.fontFamily] ?? FONT_STACKS.georgia);
   rendition.themes.fontSize(`${settings.fontSize}px`);
   rendition.themes.override('line-height', String(settings.lineHeight));
-  rendition.themes.override('padding-left', `${settings.margin}px`);
-  rendition.themes.override('padding-right', `${settings.margin}px`);
-  rendition.themes.override('max-width', `${settings.readingWidth}px`);
-  rendition.themes.override('margin-left', 'auto');
-  rendition.themes.override('margin-right', 'auto');
+  rendition.themes.override('padding-top', `${settings.padding.top}px`);
+  rendition.themes.override('padding-right', `${settings.padding.right}px`);
+  rendition.themes.override('padding-bottom', `${settings.padding.bottom}px`);
+  rendition.themes.override('padding-left', `${settings.padding.left}px`);
 }

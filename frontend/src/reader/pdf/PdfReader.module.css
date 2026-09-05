@@ -18,7 +18,7 @@
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
-  padding: var(--space-7) var(--space-5);
+  /* padding is set inline per-direction from settings.padding (reader settings menu) */
   scroll-behavior: auto;
 }
 

@@ -8,8 +8,7 @@ export const DEFAULT_READER_SETTINGS: ReaderSettings = {
   fontFamily: 'georgia',
   fontSize: 18,
   lineHeight: 1.6,
-  margin: 48,
-  readingWidth: 680,
+  padding: { top: 24, right: 96, bottom: 24, left: 96 },
   pdfZoom: 'fit-width',
   mode: 'continuous',
 };

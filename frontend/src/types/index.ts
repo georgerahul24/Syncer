@@ -104,13 +104,19 @@ export interface TocItem {
 
 export type ReaderTheme = 'light' | 'sepia' | 'dark';
 
+export interface ReaderPadding {
+  top: number;
+  right: number;
+  bottom: number;
+  left: number;
+}
+
 export interface ReaderSettings {
   theme: ReaderTheme;
   fontFamily: string;
   fontSize: number; // px, epub only
   lineHeight: number; // unitless multiplier, epub only
-  margin: number; // px, epub only
-  readingWidth: number; // px, max content width for both formats
+  padding: ReaderPadding; // px per direction, both formats — user-controlled reading comfort spacing
   pdfZoom: number | 'fit-width' | 'fit-page';
   mode: 'continuous' | 'paginated';
 }

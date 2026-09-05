@@ -49,11 +49,10 @@ nothing to virtualize.
 
 `scale` is computed once (`useMemo`) from `settings.pdfZoom` (`'fit-width'
 | 'fit-page' | number`), the container's measured size (`ResizeObserver` on
-the outer wrapper), page 1's intrinsic size, and `settings.readingWidth` as
-a cap on fit-width. `H_PADDING`/`V_PADDING` constants approximate
-`PdfReader.module.css`'s `.scrollArea` padding — if that padding changes,
-update these too (a small, deliberate coupling; re-measuring the actual
-padding every layout pass wasn't worth it).
+the outer wrapper), page 1's intrinsic size, and `settings.padding`
+(subtracted from the available width/height before fitting — the same
+padding is applied as real inline CSS on `.scrollArea`/`.paginatedViewport`,
+so the fit math and the actual rendered space always agree).
 
 `settings.theme` only affects the chrome around the pages (`.wrap`'s
 background) — the rendered page canvas is a raster of the original PDF and

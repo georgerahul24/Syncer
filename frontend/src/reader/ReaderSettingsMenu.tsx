@@ -1,4 +1,4 @@
-import type { BookFormat, ReaderSettings, ReaderTheme } from '../types';
+import type { BookFormat, ReaderPadding, ReaderSettings, ReaderTheme } from '../types';
 import styles from './ReaderSettingsMenu.module.css';
 
 const THEMES: ReaderTheme[] = ['light', 'sepia', 'dark'];
@@ -6,6 +6,7 @@ const FONTS = [
   { id: 'georgia', label: 'Serif' },
   { id: 'system', label: 'Sans' },
 ];
+const PADDING_MAX = 500;
 
 function Stepper({ label, value, unit, onDecrease, onIncrease }: { label: string; value: number; unit?: string; onDecrease: () => void; onIncrease: () => void }) {
   return (
@@ -24,6 +25,25 @@ function Stepper({ label, value, unit, onDecrease, onIncrease }: { label: string
   );
 }
 
+function Slider({ label, value, max, onChange }: { label: string; value: number; max: number; onChange: (value: number) => void }) {
+  return (
+    <div className={styles.sliderRow}>
+      <span className={styles.sliderLabel}>{label}</span>
+      <input
+        type="range"
+        min={0}
+        max={max}
+        step={4}
+        value={value}
+        onChange={(e) => onChange(Number(e.target.value))}
+        className={styles.slider}
+        aria-label={label}
+      />
+      <span className={styles.sliderValue}>{value}px</span>
+    </div>
+  );
+}
+
 export default function ReaderSettingsMenu({
   format,
   settings,
@@ -33,6 +53,10 @@ export default function ReaderSettingsMenu({
   settings: ReaderSettings;
   onChange: (patch: Partial<ReaderSettings>) => void;
 }) {
+  function setPadding(direction: keyof ReaderPadding, value: number) {
+    onChange({ padding: { ...settings.padding, [direction]: value } });
+  }
+
   return (
     <div className={styles.panel}>
       <div className={styles.group}>
@@ -100,14 +124,15 @@ export default function ReaderSettingsMenu({
               onIncrease={() => onChange({ lineHeight: Math.min(2.2, Math.round((settings.lineHeight + 0.1) * 10) / 10) })}
             />
           </div>
-          <div className={styles.group}>
-            <Stepper label="Margins" value={settings.margin} unit="px" onDecrease={() => onChange({ margin: Math.max(0, settings.margin - 8) })} onIncrease={() => onChange({ margin: Math.min(120, settings.margin + 8) })} />
-          </div>
         </>
       )}
 
       <div className={styles.group}>
-        <Stepper label="Reading width" value={settings.readingWidth} unit="px" onDecrease={() => onChange({ readingWidth: Math.max(400, settings.readingWidth - 40) })} onIncrease={() => onChange({ readingWidth: Math.min(1000, settings.readingWidth + 40) })} />
+        <div className={styles.label}>Padding</div>
+        <Slider label="Top" value={settings.padding.top} max={PADDING_MAX} onChange={(v) => setPadding('top', v)} />
+        <Slider label="Right" value={settings.padding.right} max={PADDING_MAX} onChange={(v) => setPadding('right', v)} />
+        <Slider label="Bottom" value={settings.padding.bottom} max={PADDING_MAX} onChange={(v) => setPadding('bottom', v)} />
+        <Slider label="Left" value={settings.padding.left} max={PADDING_MAX} onChange={(v) => setPadding('left', v)} />
       </div>
     </div>
   );

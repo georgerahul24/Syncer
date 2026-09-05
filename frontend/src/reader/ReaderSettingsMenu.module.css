@@ -2,7 +2,7 @@
   position: fixed;
   top: 60px;
   right: var(--space-5);
-  width: 280px;
+  width: 300px;
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
@@ -90,4 +90,32 @@
   background: var(--color-bg);
   color: var(--color-text);
   font-size: 0.85rem;
+}
+
+.sliderRow {
+  display: grid;
+  grid-template-columns: 40px 1fr 44px;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+
+.sliderRow:last-child {
+  margin-bottom: 0;
+}
+
+.sliderLabel {
+  font-size: 0.78rem;
+  color: var(--color-text-secondary);
+}
+
+.sliderValue {
+  font-size: 0.75rem;
+  color: var(--color-text-tertiary);
+  text-align: right;
+}
+
+.slider {
+  width: 100%;
+  accent-color: var(--color-accent);
 }
