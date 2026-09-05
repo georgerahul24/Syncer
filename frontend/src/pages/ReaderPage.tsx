@@ -152,7 +152,7 @@ export default function ReaderPage({ bookId }: { bookId: string }) {
       />
 
       {settingsOpen && (
-        <ReaderSettingsMenu format={book.format} settings={settings} onChange={updateSettings} />
+        <ReaderSettingsMenu format={book.format} settings={settings} onChange={updateSettings} onClose={() => setSettingsOpen(false)} />
       )}
     </div>
   );

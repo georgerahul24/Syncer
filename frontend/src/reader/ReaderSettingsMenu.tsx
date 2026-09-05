@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import type { BookFormat, ReaderPadding, ReaderSettings, ReaderTheme } from '../types';
 import styles from './ReaderSettingsMenu.module.css';
 
@@ -48,17 +49,37 @@ export default function ReaderSettingsMenu({
   format,
   settings,
   onChange,
+  onClose,
 }: {
   format: BookFormat;
   settings: ReaderSettings;
   onChange: (patch: Partial<ReaderSettings>) => void;
+  onClose: () => void;
 }) {
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  // Dismiss on any click outside the panel — EXCEPT the top bar's own
+  // toggle button, which already opens/closes this via its own onClick.
+  // Without that exclusion, a click on the toggle while open would first
+  // close it here (mousedown fires before click) and then the toggle's
+  // onClick would immediately flip it back open, net-cancelling the close.
+  useEffect(() => {
+    function onMouseDown(e: MouseEvent) {
+      const target = e.target as Node;
+      if (panelRef.current?.contains(target)) return;
+      if ((target as HTMLElement).closest?.('[aria-label="Reader settings"]')) return;
+      onClose();
+    }
+    window.addEventListener('mousedown', onMouseDown);
+    return () => window.removeEventListener('mousedown', onMouseDown);
+  }, [onClose]);
+
   function setPadding(direction: keyof ReaderPadding, value: number) {
     onChange({ padding: { ...settings.padding, [direction]: value } });
   }
 
   return (
-    <div className={styles.panel}>
+    <div ref={panelRef} className={styles.panel}>
       <div className={styles.group}>
         <div className={styles.label}>Theme</div>
         <div className={styles.segmented}>
