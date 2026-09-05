@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { BookFormat, ReaderPadding, ReaderSettings, ReaderTheme } from '../types';
 import styles from './ReaderSettingsMenu.module.css';
 
@@ -26,7 +26,20 @@ function Stepper({ label, value, unit, onDecrease, onIncrease }: { label: string
   );
 }
 
+// `value` only feeds a committed padding change (which cascades into an
+// expensive PDF.js re-render / epub.js re-flow — see PdfReader's `scale`
+// and EpubReader's `applyAppearance` effects, both keyed on the whole
+// padding object). Firing that on every drag tick made the slider feel
+// rough. `local` gives the thumb/label instant feedback on every tick;
+// the real onChange only fires once the drag/key interaction ends.
 function Slider({ label, value, max, onChange }: { label: string; value: number; max: number; onChange: (value: number) => void }) {
+  const [local, setLocal] = useState(value);
+  useEffect(() => setLocal(value), [value]);
+
+  function commit(e: React.SyntheticEvent<HTMLInputElement>) {
+    onChange(Number(e.currentTarget.value));
+  }
+
   return (
     <div className={styles.sliderRow}>
       <span className={styles.sliderLabel}>{label}</span>
@@ -35,12 +48,14 @@ function Slider({ label, value, max, onChange }: { label: string; value: number;
         min={0}
         max={max}
         step={4}
-        value={value}
-        onChange={(e) => onChange(Number(e.target.value))}
+        value={local}
+        onChange={(e) => setLocal(Number(e.target.value))}
+        onPointerUp={commit}
+        onKeyUp={commit}
         className={styles.slider}
         aria-label={label}
       />
-      <span className={styles.sliderValue}>{value}px</span>
+      <span className={styles.sliderValue}>{local}px</span>
     </div>
   );
 }

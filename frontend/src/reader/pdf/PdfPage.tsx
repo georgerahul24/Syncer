@@ -59,6 +59,11 @@ export default function PdfPage({
   const [size, setSize] = useState({ width: placeholderWidth, height: placeholderHeight });
   const sizeRef = useRef(size);
   sizeRef.current = size;
+  // Drives a short fade-in once the canvas actually has pixels, instead of
+  // the canvas popping in abruptly the instant it mounts (mounting and
+  // having rendered content are two different moments — see the render
+  // effect below).
+  const [rendered, setRendered] = useState(false);
 
   useEffect(() => {
     registerNode(pageNumber, rootRef.current);
@@ -75,7 +80,10 @@ export default function PdfPage({
   }, [active, placeholderWidth, placeholderHeight]);
 
   useEffect(() => {
-    if (!active) return;
+    if (!active) {
+      setRendered(false);
+      return;
+    }
     let cancelled = false;
     let renderTask: ReturnType<import('pdfjs-dist').PDFPageProxy['render']> | null = null;
     let textLayer: InstanceType<typeof pdfjs.TextLayer> | null = null;
@@ -112,7 +120,9 @@ export default function PdfPage({
       } catch {
         return; // cancelled — expected when this page scrolls out before finishing
       }
-      if (cancelled || !textLayerRef.current) return;
+      if (cancelled) return;
+      setRendered(true);
+      if (!textLayerRef.current) return;
 
       textLayerRef.current.innerHTML = '';
       const textContent = await page.getTextContent();
@@ -128,6 +138,7 @@ export default function PdfPage({
       cancelled = true;
       renderTask?.cancel();
       textLayer?.cancel();
+      setRendered(false);
     };
   }, [doc, pageNumber, scale, active, onMeasured]);
 
@@ -176,7 +187,7 @@ export default function PdfPage({
       style={{ width: size.width, height: size.height }}
       onMouseUp={handleMouseUp}
     >
-      {active && <canvas ref={canvasRef} className={styles.canvas} />}
+      {active && <canvas ref={canvasRef} className={styles.canvas} style={{ opacity: rendered ? 1 : 0 }} />}
       {active && <div ref={textLayerRef} className={styles.textLayer} style={{ width: size.width, height: size.height }} />}
       {active &&
         highlights.map((a) => {

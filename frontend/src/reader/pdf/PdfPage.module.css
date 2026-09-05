@@ -3,10 +3,17 @@
   margin: 0 auto var(--space-4);
   background: #fff;
   box-shadow: var(--shadow-sm);
+  /* Skip layout/paint for pages far outside the viewport — width/height
+     are always set explicitly via inline style, so this can't collapse
+     the box; it just cuts wasted work on long documents. Complements,
+     doesn't replace, the IntersectionObserver-driven canvas mount/unmount
+     in PdfReader.tsx. */
+  content-visibility: auto;
 }
 
 .canvas {
   display: block;
+  transition: opacity 150ms ease;
 }
 
 .textLayer {
