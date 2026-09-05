@@ -41,6 +41,18 @@ export default function LibraryPage() {
   useEffect(loadFolders, [loadFolders]);
   useEffect(loadTags, [loadTags]);
 
+  // A failed share-target upload (see backend/src/share/routes.ts) redirects
+  // here with ?error=..., since that's a real page navigation, not a fetch()
+  // call we could otherwise catch a rejection from.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const shareError = params.get('error');
+    if (shareError) {
+      setError(shareError);
+      window.history.replaceState(null, '', window.location.pathname);
+    }
+  }, []);
+
   const openBook = (book: Book) => navigate(`/book/${book.id}`);
 
   const deleteBook = async (book: Book) => {

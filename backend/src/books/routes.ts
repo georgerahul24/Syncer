@@ -7,22 +7,13 @@ import { db } from '../database/db.js';
 import { requireAuth } from '../middleware/auth.js';
 import { AppError, asyncRoute } from '../middleware/errors.js';
 import { DATA_DIR, MAX_UPLOAD_BYTES } from '../config.js';
-import {
-  bookFilePath,
-  coverFilePath,
-  deleteBookDir,
-  ensureBookDir,
-  sha256File,
-  streamFileWithRange,
-} from '../storage/fileStorage.js';
-import { extractPdfMetadata } from './pdfMetadata.js';
-import { extractEpubMetadata } from './epubMetadata.js';
+import { bookFilePath, deleteBookDir, streamFileWithRange } from '../storage/fileStorage.js';
+import { createBookFromUpload } from './createBook.js';
 import { getOwnedBook, type BookRow } from './access.js';
-import AdmZip from 'adm-zip';
 
 export const booksRouter = Router();
 
-const TMP_DIR = path.join(DATA_DIR, 'tmp');
+export const TMP_DIR = path.join(DATA_DIR, 'tmp');
 fs.mkdirSync(TMP_DIR, { recursive: true });
 // Anything left here is from an upload that never finished (e.g. the
 // process crashed mid-request) — safe to clear on every startup since a
@@ -31,40 +22,13 @@ for (const name of fs.readdirSync(TMP_DIR)) {
   fs.rmSync(path.join(TMP_DIR, name), { force: true });
 }
 
-const upload = multer({
+export const upload = multer({
   storage: multer.diskStorage({
     destination: TMP_DIR,
     filename: (_req, _file, cb) => cb(null, randomUUID()),
   }),
   limits: { fileSize: MAX_UPLOAD_BYTES },
 });
-
-const PDF_MAGIC = Buffer.from('%PDF-');
-const ZIP_MAGIC = Buffer.from([0x50, 0x4b, 0x03, 0x04]);
-
-function sniffFormat(filePath: string): 'pdf' | 'epub' | null {
-  const fd = fs.openSync(filePath, 'r');
-  try {
-    const head = Buffer.alloc(8);
-    fs.readSync(fd, head, 0, 8, 0);
-    if (head.subarray(0, PDF_MAGIC.length).equals(PDF_MAGIC)) return 'pdf';
-    if (head.subarray(0, ZIP_MAGIC.length).equals(ZIP_MAGIC)) return 'epub';
-    return null;
-  } finally {
-    fs.closeSync(fd);
-  }
-}
-
-function isGenuineEpub(filePath: string): boolean {
-  try {
-    const zip = new AdmZip(filePath);
-    const mimeEntry = zip.getEntry('mimetype');
-    if (!mimeEntry) return false;
-    return zip.readAsText(mimeEntry).trim() === 'application/epub+zip';
-  } catch {
-    return false;
-  }
-}
 
 interface TagDto {
   id: string;
@@ -156,81 +120,7 @@ booksRouter.post(
   asyncRoute(async (req, res) => {
     const file = req.file;
     if (!file) throw new AppError(400, 'No file was uploaded');
-
-    const cleanup = () => fs.rm(file.path, { force: true }, () => {});
-
-    const format = sniffFormat(file.path);
-    if (!format) {
-      cleanup();
-      throw new AppError(400, 'Only PDF and EPUB files are supported');
-    }
-    if (format === 'epub' && !isGenuineEpub(file.path)) {
-      cleanup();
-      throw new AppError(400, 'This EPUB file appears to be corrupted or invalid');
-    }
-
-    const bookId = randomUUID();
-    const userId = req.userId!;
-    const now = new Date().toISOString();
-
-    let title = file.originalname.replace(/\.(pdf|epub)$/i, '') || 'Untitled';
-    let author: string | null = null;
-    let pageCount: number | null = null;
-    let identifier: string | null = null;
-    let coverBuffer: Buffer | null = null;
-    let coverExt: string | null = null;
-
-    try {
-      if (format === 'pdf') {
-        const meta = await extractPdfMetadata(file.path);
-        if (meta.title) title = meta.title;
-        author = meta.author;
-        pageCount = meta.pageCount;
-      } else {
-        const meta = extractEpubMetadata(file.path);
-        if (meta.title) title = meta.title;
-        author = meta.author;
-        identifier = meta.identifier;
-        if (meta.cover) {
-          coverBuffer = meta.cover.data;
-          coverExt = meta.cover.ext;
-        }
-      }
-    } catch (err) {
-      cleanup();
-      const msg = err instanceof Error ? err.message : '';
-      if (/password/i.test(msg)) {
-        throw new AppError(400, 'This PDF is password-protected and cannot be added');
-      }
-      throw new AppError(400, 'This file could not be read. It may be corrupted or unsupported.');
-    }
-
-    const fileSize = fs.statSync(file.path).size;
-    const fileHash = sha256File(file.path);
-
-    ensureBookDir(userId, bookId);
-    const destPath = bookFilePath(userId, bookId, format);
-    fs.renameSync(file.path, destPath);
-
-    let coverPath: string | null = null;
-    if (coverBuffer && coverExt) {
-      const dest = coverFilePath(userId, bookId, coverExt);
-      fs.writeFileSync(dest, coverBuffer);
-      coverPath = path.basename(dest);
-    }
-
-    const insertAll = db.transaction(() => {
-      db.prepare(
-        `INSERT INTO books (id, userId, title, author, format, coverPath, pageCount, identifier, syncEnabled, createdAt, updatedAt)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)`
-      ).run(bookId, userId, title, author, format, coverPath, pageCount, identifier, now, now);
-      db.prepare(
-        `INSERT INTO book_files (id, bookId, filePath, fileSize, fileHash, createdAt) VALUES (?, ?, ?, ?, ?, ?)`
-      ).run(randomUUID(), bookId, path.basename(destPath), fileSize, fileHash, now);
-    });
-    insertAll();
-
-    const book = getOwnedBook(userId, bookId);
+    const book = await createBookFromUpload(req.userId!, file.path, file.originalname);
     res.status(201).json(toDto(book));
   })
 );

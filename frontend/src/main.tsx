@@ -14,3 +14,14 @@ createRoot(document.getElementById('root')!).render(
     </RouterProvider>
   </StrictMode>
 );
+
+// Registers the (deliberately no-op) service worker so the app meets PWA
+// installability criteria on Android — see public/sw.js for why it does
+// nothing beyond existing. Requires HTTPS in production (or localhost).
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(() => {
+      // Not fatal — the app works fine without it, just isn't installable.
+    });
+  });
+}

@@ -30,6 +30,9 @@ of book files — no Docker, no external database, no cloud dependency.
 - **Offline-tolerant** — annotation edits queue and retry when the
   connection drops; reading position always resumes locally even with
   sync off.
+- **Installable PWA with Android share support** — install to your home
+  screen, and share a PDF/EPUB to Syncer directly from any app's share
+  sheet instead of opening the library and picking the file manually.
 
 ## Quick start
 
