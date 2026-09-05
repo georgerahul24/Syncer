@@ -7,6 +7,7 @@ import BookCard from '../components/BookCard';
 import LibrarySidebar, { type LibraryFilter } from '../components/LibrarySidebar';
 import OrganizeBookDialog from '../components/OrganizeBookDialog';
 import BookAnalyticsDialog from '../components/BookAnalyticsDialog';
+import LibrarySearchBar from '../components/LibrarySearchBar';
 import { formatRelativeTime } from '../utils/time';
 import styles from './LibraryPage.module.css';
 
@@ -243,6 +244,7 @@ export default function LibraryPage() {
       )}
       <div className={styles.topbar}>
         <div className={styles.brand}>Syncer</div>
+        <LibrarySearchBar />
         <div className={styles.topbarRight}>
           {error && <span role="alert" style={{ color: 'var(--color-danger)', fontSize: '0.8rem' }}>{error}</span>}
           <input

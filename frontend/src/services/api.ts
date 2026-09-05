@@ -1,4 +1,4 @@
-import type { Annotation, Book, BookStats, Folder, InkStroke, NewAnnotationInput, NotebookPage, OverviewStats, ReadingPosition, Tag, User } from '../types';
+import type { Annotation, Book, BookStats, Folder, InkStroke, NewAnnotationInput, NotebookPage, OverviewStats, ReadingPosition, SearchResult, Tag, User } from '../types';
 
 export class ApiError extends Error {
   status: number;
@@ -136,4 +136,8 @@ export const notebookPages = {
   update: (id: string, patch: { text?: string; strokes?: InkStroke[] }) =>
     request<NotebookPage>(`/notebook-pages/${id}`, { method: 'PUT', body: JSON.stringify(patch) }),
   remove: (id: string) => request<void>(`/notebook-pages/${id}`, { method: 'DELETE' }),
+};
+
+export const search = {
+  query: (q: string) => request<SearchResult[]>(`/search?q=${encodeURIComponent(q)}`),
 };

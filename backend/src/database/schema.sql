@@ -163,3 +163,17 @@ CREATE TABLE IF NOT EXISTS reading_sessions_log (
 );
 CREATE INDEX IF NOT EXISTS idx_reading_log_user ON reading_sessions_log(userId);
 CREATE INDEX IF NOT EXISTS idx_reading_log_book ON reading_sessions_log(bookId);
+
+-- Library-wide document-text search index (see backend/src/search/README.md).
+-- Populated at upload time (backend/src/books/textExtract.ts) and backfilled
+-- for pre-existing books on startup (db.ts). FTS5 virtual tables can't carry
+-- FOREIGN KEY constraints, so rows are deleted explicitly alongside the book
+-- in books/routes.ts's DELETE handler instead of relying on ON DELETE CASCADE.
+CREATE VIRTUAL TABLE IF NOT EXISTS book_text_fts USING fts5(
+  bookId UNINDEXED,
+  userId UNINDEXED,
+  page UNINDEXED,
+  locationType UNINDEXED,
+  location UNINDEXED,
+  content
+);

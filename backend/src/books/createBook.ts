@@ -8,6 +8,7 @@ import { bookFilePath, coverFilePath, ensureBookDir, sha256File } from '../stora
 import { extractPdfMetadata } from './pdfMetadata.js';
 import { extractEpubMetadata } from './epubMetadata.js';
 import { getOwnedBook, type BookRow } from './access.js';
+import { indexBookAsync } from '../search/textIndex.js';
 
 const PDF_MAGIC = Buffer.from('%PDF-');
 const ZIP_MAGIC = Buffer.from([0x50, 0x4b, 0x03, 0x04]);
@@ -119,6 +120,11 @@ export async function createBookFromUpload(userId: string, tempFilePath: string,
     ).run(randomUUID(), bookId, path.basename(destPath), fileSize, fileHash, now);
   });
   insertAll();
+
+  // Fire-and-forget: text extraction can take a few seconds on a large PDF,
+  // and search is a best-effort add-on (see search/README.md) — the upload
+  // response shouldn't wait on it. Errors are caught and logged inside.
+  void indexBookAsync(bookId, userId, format, destPath);
 
   return getOwnedBook(userId, bookId);
 }

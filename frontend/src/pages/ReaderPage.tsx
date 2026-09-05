@@ -4,6 +4,7 @@ import { useAuth } from '../hooks/useAuth';
 import { useReaderSettings } from '../hooks/useReaderSettings';
 import { useReaderSync } from '../reader/sync/useReaderSync';
 import { useControlsVisibility } from '../reader/useControlsVisibility';
+import { useFullscreen } from '../hooks/useFullscreen';
 import { useAnnotations } from '../reader/annotations/useAnnotations';
 import { books as booksApi, ApiError } from '../services/api';
 import type { Book, TocItem } from '../types';
@@ -32,6 +33,7 @@ export default function ReaderPage({ bookId }: { bookId: string }) {
 
   const { settings, update: updateSettings } = useReaderSettings();
   const { visible: controlsVisible, onActivity } = useControlsVisibility();
+  const { isFullscreen, toggle: toggleFullscreen } = useFullscreen();
   const { annotations, create, update: updateAnnotation, remove: removeAnnotation } = useAnnotations(bookId);
   const sync = useReaderSync(bookId, user?.syncEnabled ?? true, book?.syncEnabled ?? true);
 
@@ -40,6 +42,21 @@ export default function ReaderPage({ bookId }: { bookId: string }) {
       .get(bookId)
       .then(setBook)
       .catch((err) => setLoadError(err instanceof ApiError ? err.message : 'This book could not be opened.'));
+  }, [bookId]);
+
+  // A library-search result jump (see components/LibrarySearchBar.tsx)
+  // arrives as a query param on a fresh navigation rather than an
+  // in-reader TOC click, but feeds the exact same outlineTarget mechanism
+  // once the reader is open. Consumed once, then stripped from the URL so
+  // it doesn't re-fire on a later re-render or back/forward navigation.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const jumpPage = params.get('jumpPage');
+    const jumpHref = params.get('jumpHref');
+    if (jumpPage) setOutlineTarget({ label: '', page: Number(jumpPage) });
+    else if (jumpHref) setOutlineTarget({ label: '', href: jumpHref });
+    if (jumpPage || jumpHref) window.history.replaceState(null, '', window.location.pathname);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bookId]);
 
   useEffect(() => {
@@ -97,6 +114,8 @@ export default function ReaderPage({ bookId }: { bookId: string }) {
         onOpenSearch={() => setSearchOpen((v) => !v)}
         onOpenAnnotations={() => setAnnotationsOpen((v) => !v)}
         onOpenSettings={() => setSettingsOpen((v) => !v)}
+        isFullscreen={isFullscreen}
+        onToggleFullscreen={toggleFullscreen}
       />
 
       <div className={styles.content}>

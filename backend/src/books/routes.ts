@@ -10,6 +10,7 @@ import { DATA_DIR, MAX_UPLOAD_BYTES } from '../config.js';
 import { bookFilePath, deleteBookDir, streamFileWithRange } from '../storage/fileStorage.js';
 import { createBookFromUpload } from './createBook.js';
 import { getOwnedBook, type BookRow } from './access.js';
+import { deleteBookTextIndex } from '../search/textIndex.js';
 
 export const booksRouter = Router();
 
@@ -154,6 +155,7 @@ booksRouter.get('/:id/cover', (req, res) => {
 booksRouter.delete('/:id', (req, res) => {
   const book = getOwnedBook(req.userId!, req.params.id);
   db.prepare(`DELETE FROM books WHERE id = ?`).run(book.id); // cascades via FK
+  deleteBookTextIndex(book.id); // FTS5 virtual table can't carry a FOREIGN KEY, so this isn't covered by the cascade above
   deleteBookDir(book.userId, book.id);
   res.status(204).end();
 });

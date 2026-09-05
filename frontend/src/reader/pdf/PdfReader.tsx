@@ -294,11 +294,15 @@ export default function PdfReader({
   }, [ready, remoteUpdate]);
 
   useEffect(() => {
-    if (!outlineTarget) return;
+    // `ready` matters here (see the equivalent comment in EpubReader.tsx):
+    // a target set before the document/pages exist — e.g. a library-search
+    // jump landing on a fresh page load — must wait and retry once ready,
+    // not be silently dropped the instant goToPage's node lookup misses.
+    if (!ready || !outlineTarget) return;
     if (outlineTarget.page != null) goToPage(outlineTarget.page, { discrete: true });
     onOutlineTargetHandled();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [outlineTarget]);
+  }, [ready, outlineTarget]);
 
   useEffect(() => {
     if (!focusAnnotationId) return;

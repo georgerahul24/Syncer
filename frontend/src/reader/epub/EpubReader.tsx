@@ -317,7 +317,13 @@ export default function EpubReader({
   }, [ready, settings.theme, settings.fontFamily, settings.fontSize, settings.lineHeight, settings.padding]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    if (!outlineTarget || !renditionRef.current) return;
+    // `ready` (not just renditionRef.current) matters here: a target set
+    // before the rendition exists — e.g. a library-search jump landing on
+    // a fresh page load, vs. a TOC click which can't happen until the book
+    // is already open — must wait rather than being silently dropped.
+    // renditionRef is a ref, so it alone wouldn't retrigger this effect
+    // once `ready` flips; `ready` in the deps is what makes the retry happen.
+    if (!ready || !outlineTarget || !renditionRef.current) return;
     // A TOC click IS a real user navigation — publish it (not suppressed),
     // and treat it as discrete so it syncs immediately rather than waiting
     // out the debounce.
@@ -326,7 +332,7 @@ export default function EpubReader({
       renditionRef.current.display(outlineTarget.href);
     }
     onOutlineTargetHandled();
-  }, [outlineTarget, onOutlineTargetHandled]);
+  }, [ready, outlineTarget, onOutlineTargetHandled]);
 
   useEffect(() => {
     if (!focusAnnotationId) return;

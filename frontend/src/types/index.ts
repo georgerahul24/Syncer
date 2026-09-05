@@ -153,6 +153,18 @@ export interface InkStroke {
   points: Array<{ x: number; y: number; pressure: number }>;
 }
 
+export interface SearchResult {
+  bookId: string;
+  bookTitle: string;
+  bookAuthor: string | null;
+  format: BookFormat;
+  kind: 'text' | 'annotation' | 'book';
+  snippet: string;
+  locationType?: 'pdf-page' | 'epub-chapter' | 'pdf' | 'epub';
+  location?: { page?: number; href?: string } & Record<string, unknown>;
+  annotationId?: string;
+}
+
 export interface NotebookPage {
   id: string;
   bookId: string;

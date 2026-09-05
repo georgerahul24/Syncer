@@ -10,6 +10,7 @@ import { tagsRouter } from './tags/routes.js';
 import { shareTargetRouter } from './share/routes.js';
 import { analyticsRouter } from './analytics/routes.js';
 import { notebookRouter } from './notebook/routes.js';
+import { searchRouter } from './search/routes.js';
 import { errorHandler, notFoundHandler } from './middleware/errors.js';
 import { FRONTEND_DIST } from './config.js';
 
@@ -27,6 +28,7 @@ export function createApp() {
   app.use('/api', tagsRouter);
   app.use('/api', analyticsRouter);
   app.use('/api', notebookRouter);
+  app.use('/api', searchRouter);
   app.use(shareTargetRouter);
 
   app.use('/api', notFoundHandler);

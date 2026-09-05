@@ -29,6 +29,8 @@ export default function ReaderTopBar({
   onOpenSearch,
   onOpenAnnotations,
   onOpenSettings,
+  isFullscreen,
+  onToggleFullscreen,
 }: {
   visible: boolean;
   book: Book;
@@ -43,6 +45,8 @@ export default function ReaderTopBar({
   onOpenSearch: () => void;
   onOpenAnnotations: () => void;
   onOpenSettings: () => void;
+  isFullscreen: boolean;
+  onToggleFullscreen: () => void;
 }) {
   let syncLabel: string;
   let syncAction: { label: string; onClick: () => void } | null = null;
@@ -91,6 +95,15 @@ export default function ReaderTopBar({
       </button>
       <button type="button" className={styles.iconButton} onClick={onOpenSettings} aria-label="Reader settings">
         Aa
+      </button>
+      <button
+        type="button"
+        className={styles.iconButton}
+        onClick={onToggleFullscreen}
+        aria-label={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
+        title={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
+      >
+        {isFullscreen ? '⤡' : '⤢'}
       </button>
     </div>
   );
