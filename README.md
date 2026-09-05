@@ -22,6 +22,13 @@ of book files — no Docker, no external database, no cloud dependency.
 - **In-book search** across PDF and EPUB text *and* your own highlights/notes,
   with a virtualized PDF renderer that stays fast on 1000+ page documents
   (only nearby pages are ever rendered).
+- **Library-wide search** — one search bar finds a match across every book
+  you own (document text, highlights/notes, titles), and jumps straight to
+  the matching page or chapter, not just the book you have open.
+- **Blank notebook pages** — insert a page anywhere in a PDF's continuous
+  scroll for typed notes and freehand ink (stylus/touch pressure-sensitive).
+- **Fullscreen reading** and four independent padding sliders (top/right/
+  bottom/left) for dialing in a comfortable reading layout.
 - **Folders and tags** to organize a large library, with drag-and-drop —
   drag books onto a folder in the sidebar, or drag files from your OS
   straight onto the library to upload them — plus reading-progress sections
