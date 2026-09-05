@@ -44,6 +44,14 @@ of book files — no Docker, no external database, no cloud dependency.
 
 Requires Node.js 20+. No database server, no Docker.
 
+`better-sqlite3` is a native addon and compiles from source on
+`npm install`, so a fresh Linux box needs a C++ build toolchain first:
+
+```bash
+# Debian/Ubuntu only, skip if `make`/`gcc` are already installed
+sudo apt-get update && sudo apt-get install -y build-essential python3
+```
+
 ```bash
 npm install
 npm run build
