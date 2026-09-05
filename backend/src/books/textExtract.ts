@@ -4,10 +4,22 @@ import AdmZip from 'adm-zip';
 import { XMLParser } from 'fast-xml-parser';
 
 export interface ExtractedTextChunk {
-  page: number; // 1-based PDF page, or 1-based spine position for EPUB
-  locationType: 'pdf-page' | 'epub-chapter';
-  location: { page: number } | { href: string };
+  page: number; // 1-based PDF page, or 1-based spine position for EPUB; always 1 for txt
+  locationType: 'pdf-page' | 'epub-chapter' | 'txt';
+  location: { page: number } | { href: string } | Record<string, never>;
   text: string;
+}
+
+/**
+ * A .txt book is indexed as a single chunk (unlike PDF/EPUB, it has no
+ * natural page/chapter boundaries) — a library-search hit can open the
+ * book but can't jump to the exact match position within it, same
+ * trade-off as an EPUB match only jumping to its chapter, not a precise
+ * CFI (see search/README.md).
+ */
+export function extractTxtText(filePath: string): ExtractedTextChunk[] {
+  const text = fs.readFileSync(filePath, 'utf-8').trim();
+  return text ? [{ page: 1, locationType: 'txt', location: {}, text }] : [];
 }
 
 /** Per-page plain text, using the same PDF.js Node build as pdfMetadata.ts. */

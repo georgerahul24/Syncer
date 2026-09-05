@@ -1,4 +1,4 @@
-export type BookFormat = 'pdf' | 'epub';
+export type BookFormat = 'pdf' | 'epub' | 'txt';
 
 export interface User {
   id: string;
@@ -48,9 +48,13 @@ export interface EpubLocation {
   scrollOffset: number;
 }
 
+export interface TxtLocation {
+  scrollOffset: number; // fraction 0..1 of the textarea's scrollable height
+}
+
 export interface ReadingPosition {
-  locationType: 'pdf-page' | 'epub-cfi';
-  location: PdfLocation | EpubLocation;
+  locationType: 'pdf-page' | 'epub-cfi' | 'txt';
+  location: PdfLocation | EpubLocation | TxtLocation;
   progress: number; // 0..1
   revision: number;
   updatedAt: string;
@@ -160,7 +164,7 @@ export interface SearchResult {
   format: BookFormat;
   kind: 'text' | 'annotation' | 'book';
   snippet: string;
-  locationType?: 'pdf-page' | 'epub-chapter' | 'pdf' | 'epub';
+  locationType?: 'pdf-page' | 'epub-chapter' | 'txt' | 'pdf' | 'epub';
   location?: { page?: number; href?: string } & Record<string, unknown>;
   annotationId?: string;
 }

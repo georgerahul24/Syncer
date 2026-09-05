@@ -137,7 +137,7 @@ export default function ReaderSettingsMenu({
         </div>
       )}
 
-      {format === 'epub' && (
+      {(format === 'epub' || format === 'txt') && (
         <>
           <div className={styles.group}>
             <div className={styles.label}>Font</div>

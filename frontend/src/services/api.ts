@@ -77,6 +77,8 @@ export const books = {
     request<{ folderId: string | null }>(`/books/${id}/folder`, { method: 'PUT', body: JSON.stringify({ folderId }) }),
   fileUrl: (id: string) => `/api/books/${id}/file`,
   coverUrl: (id: string) => `/api/books/${id}/cover`,
+  saveTextContent: (id: string, content: string) =>
+    request<void>(`/books/${id}/content`, { method: 'PUT', body: JSON.stringify({ content }) }),
 };
 
 export const folders = {

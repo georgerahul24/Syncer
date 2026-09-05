@@ -12,14 +12,14 @@ interface BookMeta {
   id: string;
   title: string;
   author: string | null;
-  format: 'pdf' | 'epub';
+  format: 'pdf' | 'epub' | 'txt';
 }
 
 export interface SearchResult {
   bookId: string;
   bookTitle: string;
   bookAuthor: string | null;
-  format: 'pdf' | 'epub';
+  format: 'pdf' | 'epub' | 'txt';
   kind: 'text' | 'annotation' | 'book';
   snippet: string;
   locationType?: string;

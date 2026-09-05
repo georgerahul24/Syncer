@@ -53,6 +53,11 @@ export default function BookCard({
           <img className={styles.cover} src={book.coverUrl} alt="" loading="lazy" />
         ) : book.format === 'pdf' ? (
           <PdfCoverThumbnail bookId={book.id} title={book.title} />
+        ) : book.format === 'txt' ? (
+          <div className={styles.txtCover}>
+            <span className={styles.txtCoverIcon}>📄</span>
+            <span className={styles.txtCoverTitle}>{book.title}</span>
+          </div>
         ) : (
           <div className={styles.cover} />
         )}

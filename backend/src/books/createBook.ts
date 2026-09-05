@@ -12,18 +12,47 @@ import { indexBookAsync } from '../search/textIndex.js';
 
 const PDF_MAGIC = Buffer.from('%PDF-');
 const ZIP_MAGIC = Buffer.from([0x50, 0x4b, 0x03, 0x04]);
+const TEXT_SNIFF_SAMPLE_BYTES = 8192;
 
-function sniffFormat(filePath: string): 'pdf' | 'epub' | null {
+// Plain text has no magic bytes, so it's the one format we sniff by content
+// shape instead: no NUL bytes (never appear in real text), and decoding the
+// sample as UTF-8 produces very few replacement characters or raw control
+// codes. Not perfect, but consistent with never trusting a file's claimed
+// type from its name/extension — same principle as the PDF/EPUB magic-byte
+// checks above, applied to a format that doesn't have magic bytes to check.
+function looksLikePlainText(filePath: string): boolean {
+  const fd = fs.openSync(filePath, 'r');
+  try {
+    const size = fs.fstatSync(fd).size;
+    if (size === 0) return false;
+    const sampleSize = Math.min(TEXT_SNIFF_SAMPLE_BYTES, size);
+    const buf = Buffer.alloc(sampleSize);
+    fs.readSync(fd, buf, 0, sampleSize, 0);
+    if (buf.includes(0)) return false;
+    const text = new TextDecoder('utf-8', { fatal: false }).decode(buf);
+    let suspicious = 0;
+    for (const ch of text) {
+      const code = ch.codePointAt(0)!;
+      if (code === 0xfffd) suspicious++; // invalid UTF-8 byte sequence
+      else if (code < 0x20 && code !== 9 && code !== 10 && code !== 13) suspicious++; // control chars other than tab/LF/CR
+    }
+    return suspicious / text.length < 0.02;
+  } finally {
+    fs.closeSync(fd);
+  }
+}
+
+function sniffFormat(filePath: string): 'pdf' | 'epub' | 'txt' | null {
   const fd = fs.openSync(filePath, 'r');
   try {
     const head = Buffer.alloc(8);
     fs.readSync(fd, head, 0, 8, 0);
     if (head.subarray(0, PDF_MAGIC.length).equals(PDF_MAGIC)) return 'pdf';
     if (head.subarray(0, ZIP_MAGIC.length).equals(ZIP_MAGIC)) return 'epub';
-    return null;
   } finally {
     fs.closeSync(fd);
   }
+  return looksLikePlainText(filePath) ? 'txt' : null;
 }
 
 function isGenuineEpub(filePath: string): boolean {
@@ -54,7 +83,7 @@ export async function createBookFromUpload(userId: string, tempFilePath: string,
   const format = sniffFormat(tempFilePath);
   if (!format) {
     cleanup();
-    throw new AppError(400, 'Only PDF and EPUB files are supported');
+    throw new AppError(400, 'Only PDF, EPUB, and plain text (.txt) files are supported');
   }
   if (format === 'epub' && !isGenuineEpub(tempFilePath)) {
     cleanup();
@@ -64,7 +93,7 @@ export async function createBookFromUpload(userId: string, tempFilePath: string,
   const bookId = randomUUID();
   const now = new Date().toISOString();
 
-  let title = originalName.replace(/\.(pdf|epub)$/i, '') || 'Untitled';
+  let title = originalName.replace(/\.(pdf|epub|txt)$/i, '') || 'Untitled';
   let author: string | null = null;
   let pageCount: number | null = null;
   let identifier: string | null = null;
@@ -77,7 +106,7 @@ export async function createBookFromUpload(userId: string, tempFilePath: string,
       if (meta.title) title = meta.title;
       author = meta.author;
       pageCount = meta.pageCount;
-    } else {
+    } else if (format === 'epub') {
       const meta = extractEpubMetadata(tempFilePath);
       if (meta.title) title = meta.title;
       author = meta.author;
@@ -87,6 +116,8 @@ export async function createBookFromUpload(userId: string, tempFilePath: string,
         coverExt = meta.cover.ext;
       }
     }
+    // txt: no metadata to extract — title stays the filename, everything
+    // else stays null/default (set above).
   } catch (err) {
     cleanup();
     const msg = err instanceof Error ? err.message : '';

@@ -1,13 +1,17 @@
 # Syncer
 
-A self-hosted PDF and EPUB reader with real-time cross-device reading
-sync, highlights, and notes. One Node process, one SQLite file, a folder
-of book files — no Docker, no external database, no cloud dependency.
+A self-hosted PDF, EPUB, and plain-text reader with real-time
+cross-device reading sync, highlights, and notes. One Node process, one
+SQLite file, a folder of book files — no Docker, no external database, no
+cloud dependency.
 
 ## Features
 
 - **PDF and EPUB support** — PDF.js and epub.js under the hood, not a
   custom renderer.
+- **Plain text (.txt) files as live-editable "books"** — open one straight
+  into an editable view; edits autosave and sync like everything else
+  (last-write-wins, no realtime multi-cursor merging).
 - **Continuous scroll or paginated reading**, per book, with keyboard and
   touch navigation.
 - **Cross-device sync** — reading position follows you between tabs,

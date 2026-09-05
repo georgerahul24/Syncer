@@ -47,11 +47,14 @@ test('sharing a PDF creates the book and redirects straight to its reader page',
 });
 
 test('sharing an invalid file redirects back to the library with an error message', async () => {
+  // See the equivalent comment in books/books.test.ts — plain readable text
+  // is now legitimately accepted as a .txt book, so this needs genuine
+  // binary garbage to still be an "invalid file" case.
   const client = new TestClient(baseUrl);
   await client.post('/api/auth/register', { email: `share-bad-${randomUUID()}@example.com`, password: 'correct-horse' });
 
   const form = new FormData();
-  form.append('file', new Blob([Buffer.from('not a book')]), 'shared.pdf');
+  form.append('file', new Blob([Buffer.from([0x00, 0x01, 0x02, 0xff, 0xfe, 0x10, 0x20, 0x30, 0x00, 0x00])]), 'shared.pdf');
   const res = await fetch(`${baseUrl}/share-target`, {
     method: 'POST',
     headers: { Cookie: client.cookieHeader! },

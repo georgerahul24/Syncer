@@ -26,7 +26,7 @@ export function ensureBookDir(userId: string, bookId: string): string {
   return dir;
 }
 
-export function bookFilePath(userId: string, bookId: string, format: 'pdf' | 'epub'): string {
+export function bookFilePath(userId: string, bookId: string, format: 'pdf' | 'epub' | 'txt'): string {
   return path.join(bookDir(userId, bookId), `book.${format}`);
 }
 
@@ -48,6 +48,7 @@ export function sha256File(filePath: string): string {
 const MIME_TYPES: Record<string, string> = {
   pdf: 'application/pdf',
   epub: 'application/epub+zip',
+  txt: 'text/plain; charset=utf-8',
   '.jpg': 'image/jpeg',
   '.jpeg': 'image/jpeg',
   '.png': 'image/png',
@@ -59,12 +60,17 @@ export function streamFileWithRange(req: Request, res: Response, filePath: strin
   const stat = fs.statSync(filePath);
   const mime = MIME_TYPES[mimeKey] || 'application/octet-stream';
   const range = req.headers.range;
+  // A PDF/EPUB upload (or a cover image) never changes after it's stored,
+  // so a long-lived cache is free correctness. A .txt "book" IS its own
+  // live-edited content (see books/routes.ts's PUT /:id/content) — caching
+  // it the same way would resurrect stale text after a save.
+  const cacheControl = mimeKey === 'txt' ? 'private, no-store' : 'private, max-age=3600';
 
   if (!range) {
     res.setHeader('Content-Type', mime);
     res.setHeader('Content-Length', stat.size);
     res.setHeader('Accept-Ranges', 'bytes');
-    res.setHeader('Cache-Control', 'private, max-age=3600');
+    res.setHeader('Cache-Control', cacheControl);
     fs.createReadStream(filePath).pipe(res);
     return;
   }

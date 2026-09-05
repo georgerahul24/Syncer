@@ -250,7 +250,7 @@ export default function LibraryPage() {
           <input
             ref={fileInputRef}
             type="file"
-            accept=".pdf,.epub,application/pdf,application/epub+zip"
+            accept=".pdf,.epub,.txt,application/pdf,application/epub+zip,text/plain"
             className="visually-hidden"
             onChange={onFilePicked}
           />

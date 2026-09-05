@@ -10,7 +10,7 @@ import { DATA_DIR, MAX_UPLOAD_BYTES } from '../config.js';
 import { bookFilePath, deleteBookDir, streamFileWithRange } from '../storage/fileStorage.js';
 import { createBookFromUpload } from './createBook.js';
 import { getOwnedBook, type BookRow } from './access.js';
-import { deleteBookTextIndex } from '../search/textIndex.js';
+import { deleteBookTextIndex, reindexTxtContent } from '../search/textIndex.js';
 
 export const booksRouter = Router();
 
@@ -143,6 +143,29 @@ booksRouter.get('/:id/file', (req, res) => {
   const filePath = bookFilePath(book.userId, book.id, book.format);
   streamFileWithRange(req, res, filePath, book.format);
 });
+
+// Live-editing save for .txt books (see reader/text/TextReader.tsx). No
+// operational-transform/CRDT merge — the request body simply overwrites the
+// file, last write wins, same as every other piece of user content in this
+// app (annotations, notebook pages). Body-size limit comes from the global
+// express.json({ limit: '2mb' }) in app.ts; no separate cap needed here.
+booksRouter.put(
+  '/:id/content',
+  asyncRoute(async (req, res) => {
+    const book = getOwnedBook(req.userId!, req.params.id);
+    if (book.format !== 'txt') throw new AppError(400, 'Only plain text books can be edited');
+    const { content } = req.body ?? {};
+    if (typeof content !== 'string') throw new AppError(400, 'content must be a string');
+
+    const filePath = bookFilePath(book.userId, book.id, book.format);
+    fs.writeFileSync(filePath, content, 'utf-8');
+    const now = new Date().toISOString();
+    db.prepare(`UPDATE books SET updatedAt = ? WHERE id = ?`).run(now, book.id);
+    reindexTxtContent(book.id, book.userId, content);
+
+    res.status(204).end();
+  })
+);
 
 booksRouter.get('/:id/cover', (req, res) => {
   const book = getOwnedBook(req.userId!, req.params.id);

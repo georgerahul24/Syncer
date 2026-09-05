@@ -65,11 +65,14 @@ test('uploading an EPUB stores it and extracts title/author', async () => {
 });
 
 test('rejects a file that is not actually a PDF or EPUB despite its extension', async () => {
+  // Plain readable text despite the .pdf name is now legitimately accepted
+  // as a .txt book (see books/txt.test.ts) — genuine binary garbage (a NUL
+  // byte makes it unambiguous) is what should still be rejected outright.
   const { client } = await newUser(`fake-${randomUUID()}@example.com`);
   const uploadRes = await fetch(`${baseUrl}/api/books`, {
     method: 'POST',
     headers: { Cookie: client.cookieHeader! },
-    body: uploadForm(Buffer.from('not a real book, just text'), 'book.pdf'),
+    body: uploadForm(Buffer.from([0x00, 0x01, 0x02, 0xff, 0xfe, 0x10, 0x20, 0x30, 0x00, 0x00]), 'book.pdf'),
   });
   assert.equal(uploadRes.status, 400);
 });

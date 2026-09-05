@@ -6,7 +6,7 @@ export interface BookRow {
   userId: string;
   title: string;
   author: string | null;
-  format: 'pdf' | 'epub';
+  format: 'pdf' | 'epub' | 'txt';
   coverPath: string | null;
   pageCount: number | null;
   identifier: string | null;

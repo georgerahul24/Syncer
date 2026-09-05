@@ -51,7 +51,7 @@ CREATE TABLE IF NOT EXISTS books (
   userId TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   title TEXT NOT NULL,
   author TEXT,
-  format TEXT NOT NULL CHECK(format IN ('pdf','epub')),
+  format TEXT NOT NULL CHECK(format IN ('pdf','epub','txt')),
   coverPath TEXT,
   pageCount INTEGER,
   identifier TEXT,

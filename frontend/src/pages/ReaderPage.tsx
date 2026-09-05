@@ -14,6 +14,7 @@ import TocPanel from '../reader/TocPanel';
 import AnnotationPanel from '../reader/annotations/AnnotationPanel';
 import PdfReader from '../reader/pdf/PdfReader';
 import EpubReader from '../reader/epub/EpubReader';
+import TextReader from '../reader/text/TextReader';
 import styles from './ReaderPage.module.css';
 
 export default function ReaderPage({ bookId }: { bookId: string }) {
@@ -95,7 +96,7 @@ export default function ReaderPage({ bookId }: { bookId: string }) {
 
   if (!book) return <div className={styles.page} />;
 
-  const ReaderComponent = book.format === 'pdf' ? PdfReader : EpubReader;
+  const ReaderComponent = book.format === 'pdf' ? PdfReader : book.format === 'epub' ? EpubReader : TextReader;
 
   return (
     <div className={styles.page} onMouseMove={onActivity} onClick={onActivity} onKeyDown={onActivity} onTouchStart={onActivity}>

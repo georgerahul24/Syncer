@@ -37,6 +37,56 @@ function ensureColumn(table: string, column: string, addColumnDdl: string): void
 ensureColumn('books', 'folderId', 'folderId TEXT REFERENCES folders(id)');
 db.exec('CREATE INDEX IF NOT EXISTS idx_books_folder ON books(folderId)');
 
+// SQLite can't ALTER a CHECK constraint in place — adding 'txt' as a third
+// `format` value means rebuilding the table via the exact procedure SQLite's
+// own docs prescribe for constraint changes ALTER TABLE can't express:
+// disable FK enforcement, rebuild inside one transaction, verify with
+// foreign_key_check before it commits, re-enable FK enforcement. Verified
+// against a full copy of a real production database (including -wal/-shm)
+// before this ever ran against one for real: row counts, all column values,
+// and every index matched exactly afterward, and foreign_key_check came
+// back clean. Idempotent — skips entirely once already migrated.
+function migrateBooksFormatCheck(): void {
+  const row = db.prepare(`SELECT sql FROM sqlite_master WHERE type='table' AND name='books'`).get() as { sql: string } | undefined;
+  if (!row || row.sql.includes("'txt'")) return;
+
+  const migrate = db.transaction(() => {
+    db.exec(`
+      CREATE TABLE books_new (
+        id TEXT PRIMARY KEY,
+        userId TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        title TEXT NOT NULL,
+        author TEXT,
+        format TEXT NOT NULL CHECK(format IN ('pdf','epub','txt')),
+        coverPath TEXT,
+        pageCount INTEGER,
+        identifier TEXT,
+        syncEnabled INTEGER NOT NULL DEFAULT 1,
+        folderId TEXT REFERENCES folders(id),
+        createdAt TEXT NOT NULL,
+        updatedAt TEXT NOT NULL
+      );
+    `);
+    db.exec(
+      `INSERT INTO books_new SELECT id, userId, title, author, format, coverPath, pageCount, identifier, syncEnabled, folderId, createdAt, updatedAt FROM books`
+    );
+    db.exec(`DROP TABLE books`);
+    db.exec(`ALTER TABLE books_new RENAME TO books`);
+    db.exec('CREATE INDEX IF NOT EXISTS idx_books_user ON books(userId)');
+    db.exec('CREATE INDEX IF NOT EXISTS idx_books_folder ON books(folderId)');
+    const fkErrors = db.pragma('foreign_key_check') as unknown[];
+    if (fkErrors.length > 0) throw new Error(`books format-check migration left dangling foreign keys: ${JSON.stringify(fkErrors)}`);
+  });
+
+  db.pragma('foreign_keys = OFF');
+  try {
+    migrate();
+  } finally {
+    db.pragma('foreign_keys = ON');
+  }
+}
+migrateBooksFormatCheck();
+
 // reader_sessions is a live mirror of the in-memory WebSocket registry in
 // sync/hub.ts (see that file), not durable state — a fresh process starts
 // with zero live connections by definition, so any row still here is left
