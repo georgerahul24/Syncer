@@ -31,13 +31,21 @@
 .insertPageButton {
   width: 100%;
   max-width: 300px;
-  margin: 2px 0;
-  padding: 3px 0;
-  font-size: 0.7rem;
+  min-height: 30px; /* comfortable tap target for touch/stylus, not just a mouse-hover sliver */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 4px 0;
+  padding: 6px 0;
+  font-size: 0.72rem;
   color: var(--color-text-tertiary, var(--color-text-secondary));
   border: 1px dashed transparent;
   border-radius: var(--radius-sm, 6px);
-  opacity: 0;
+  /* Always at least faintly visible — this used to be opacity:0, revealed
+     only on `.pageList:hover`, which meant it was effectively invisible on
+     a stylus/touch device (no hover state at all), the exact audience the
+     notebook-page feature is for. */
+  opacity: 0.35;
   transition: opacity 0.15s;
 }
 
@@ -45,7 +53,8 @@
   opacity: 0.6;
 }
 
-.insertPageButton:hover {
+.insertPageButton:hover,
+.insertPageButton:focus-visible {
   opacity: 1 !important;
   border-color: var(--color-border-strong);
   background: var(--color-bg);
