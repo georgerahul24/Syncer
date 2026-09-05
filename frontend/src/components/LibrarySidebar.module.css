@@ -27,6 +27,13 @@
   font-weight: 500;
 }
 
+.itemDragOver {
+  background: var(--color-accent);
+  color: var(--color-accent-contrast);
+  outline: 2px dashed var(--color-accent);
+  outline-offset: -2px;
+}
+
 .itemLabel {
   flex: 1;
   overflow: hidden;

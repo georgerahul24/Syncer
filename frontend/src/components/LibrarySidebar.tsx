@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { Folder, Tag } from '../types';
+import { BOOK_DRAG_MIME } from './BookCard';
 import styles from './LibrarySidebar.module.css';
 
 export type LibraryFilter = { kind: 'all' } | { kind: 'unfiled' } | { kind: 'folder'; id: string } | { kind: 'tag'; name: string };
@@ -20,6 +21,7 @@ export default function LibrarySidebar({
   onRenameFolder,
   onDeleteFolder,
   onDeleteTag,
+  onDropBook,
 }: {
   folders: Folder[];
   tags: Tag[];
@@ -29,11 +31,31 @@ export default function LibrarySidebar({
   onRenameFolder: (id: string, name: string) => void;
   onDeleteFolder: (id: string) => void;
   onDeleteTag: (id: string) => void;
+  onDropBook: (bookId: string, folderId: string | null) => void;
 }) {
   const [addingFolder, setAddingFolder] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
   const [editingFolderId, setEditingFolderId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState('');
+  const [dragOverKey, setDragOverKey] = useState<string | null>(null);
+
+  function dropTargetProps(key: string, folderId: string | null) {
+    return {
+      onDragOver: (e: React.DragEvent) => {
+        if (!e.dataTransfer.types.includes(BOOK_DRAG_MIME)) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        if (dragOverKey !== key) setDragOverKey(key);
+      },
+      onDragLeave: () => setDragOverKey((k) => (k === key ? null : k)),
+      onDrop: (e: React.DragEvent) => {
+        e.preventDefault();
+        setDragOverKey(null);
+        const bookId = e.dataTransfer.getData(BOOK_DRAG_MIME);
+        if (bookId) onDropBook(bookId, folderId);
+      },
+    };
+  }
 
   function submitNewFolder() {
     const name = newFolderName.trim();
@@ -55,7 +77,12 @@ export default function LibrarySidebar({
       <button type="button" className={`${styles.item} ${filter.kind === 'all' ? styles.itemActive : ''}`} onClick={() => onFilterChange({ kind: 'all' })}>
         <span className={styles.itemLabel}>All Books</span>
       </button>
-      <button type="button" className={`${styles.item} ${filter.kind === 'unfiled' ? styles.itemActive : ''}`} onClick={() => onFilterChange({ kind: 'unfiled' })}>
+      <button
+        type="button"
+        className={`${styles.item} ${filter.kind === 'unfiled' ? styles.itemActive : ''} ${dragOverKey === 'unfiled' ? styles.itemDragOver : ''}`}
+        onClick={() => onFilterChange({ kind: 'unfiled' })}
+        {...dropTargetProps('unfiled', null)}
+      >
         <span className={styles.itemLabel}>Unfiled</span>
       </button>
 
@@ -85,12 +112,13 @@ export default function LibrarySidebar({
           ) : (
             <button
               type="button"
-              className={`${styles.item} ${filtersEqual(filter, { kind: 'folder', id: f.id }) ? styles.itemActive : ''}`}
+              className={`${styles.item} ${filtersEqual(filter, { kind: 'folder', id: f.id }) ? styles.itemActive : ''} ${dragOverKey === f.id ? styles.itemDragOver : ''}`}
               onClick={() => onFilterChange({ kind: 'folder', id: f.id })}
               onDoubleClick={() => {
                 setEditingFolderId(f.id);
                 setEditingName(f.name);
               }}
+              {...dropTargetProps(f.id, f.id)}
             >
               <span className={styles.itemLabel}>{f.name}</span>
               <span className={styles.count}>{f.bookCount}</span>

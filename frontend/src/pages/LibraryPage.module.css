@@ -24,6 +24,29 @@
   font-size: 0.9rem;
 }
 
+.dropOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: rgba(0, 113, 227, 0.08);
+  backdrop-filter: blur(1px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.dropOverlayCard {
+  padding: var(--space-5) var(--space-7);
+  border-radius: var(--radius-lg);
+  border: 2px dashed var(--color-accent);
+  background: var(--color-surface);
+  color: var(--color-accent);
+  font-size: 1rem;
+  font-weight: 500;
+  box-shadow: var(--shadow-md);
+}
+
 @media (max-width: 860px) {
   .layout {
     flex-direction: column;

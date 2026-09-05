@@ -16,6 +16,19 @@
   inset: 0;
 }
 
+/* epub.js's 'scrolled-doc' flow renders the current section as ONE iframe
+   sized to its own full content height (not clipped to the viewport) and
+   expects the surrounding element to be an ordinary scrollable container.
+   Without overflow-y here, that over-tall iframe just overflows .container
+   with nothing to scroll it — the book never advances past 0%. Paginated
+   mode does NOT want this (epub.js paginates via CSS columns internally
+   and the container should stay a fixed, non-scrolling viewport), so it's
+   applied conditionally, not on .container itself. */
+.containerScrolled {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
 .container :global(iframe) {
   border: none;
 }

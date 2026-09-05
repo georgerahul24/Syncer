@@ -20,7 +20,9 @@ export default function LibraryPage() {
   const [error, setError] = useState<string | null>(null);
   const [uploadPct, setUploadPct] = useState<number | null>(null);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [isDraggingFile, setIsDraggingFile] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const dragCounterRef = useRef(0);
 
   const load = useCallback(() => {
     booksApi
@@ -51,10 +53,7 @@ export default function LibraryPage() {
     }
   };
 
-  const onFilePicked = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    e.target.value = '';
-    if (!file) return;
+  const uploadFile = async (file: File) => {
     setError(null);
     setUploadPct(0);
     try {
@@ -65,6 +64,47 @@ export default function LibraryPage() {
     } finally {
       setUploadPct(null);
     }
+  };
+
+  const onFilePicked = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (file) uploadFile(file);
+  };
+
+  // Dropping a file anywhere on the library uploads it; dropping a book
+  // card (see BookCard's BOOK_DRAG_MIME) is a different drag entirely and
+  // must not trigger this — checked via dataTransfer.types, since the
+  // actual book-id payload isn't readable until the 'drop' event fires.
+  const isFileDrag = (e: React.DragEvent) => e.dataTransfer.types.includes('Files');
+
+  const onPageDragEnter = (e: React.DragEvent) => {
+    if (!isFileDrag(e)) return;
+    e.preventDefault();
+    dragCounterRef.current += 1;
+    setIsDraggingFile(true);
+  };
+  const onPageDragOver = (e: React.DragEvent) => {
+    if (!isFileDrag(e)) return;
+    e.preventDefault();
+  };
+  const onPageDragLeave = (e: React.DragEvent) => {
+    if (!isFileDrag(e)) return;
+    dragCounterRef.current = Math.max(0, dragCounterRef.current - 1);
+    if (dragCounterRef.current === 0) setIsDraggingFile(false);
+  };
+  const onPageDrop = (e: React.DragEvent) => {
+    if (!isFileDrag(e)) return;
+    e.preventDefault();
+    dragCounterRef.current = 0;
+    setIsDraggingFile(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) uploadFile(file);
+  };
+
+  const onDropBookOnFolder = (bookId: string, folderId: string | null) => {
+    const book = books?.find((b) => b.id === bookId);
+    if (book) setBookFolder(book, folderId);
   };
 
   const toggleGlobalSync = async () => {
@@ -175,7 +215,18 @@ export default function LibraryPage() {
           : 'All Books';
 
   return (
-    <div className={styles.page}>
+    <div
+      className={styles.page}
+      onDragEnter={onPageDragEnter}
+      onDragOver={onPageDragOver}
+      onDragLeave={onPageDragLeave}
+      onDrop={onPageDrop}
+    >
+      {isDraggingFile && (
+        <div className={styles.dropOverlay}>
+          <div className={styles.dropOverlayCard}>Drop to upload</div>
+        </div>
+      )}
       <div className={styles.topbar}>
         <div className={styles.brand}>Syncer</div>
         <div className={styles.topbarRight}>
@@ -239,6 +290,7 @@ export default function LibraryPage() {
               onRenameFolder={renameFolder}
               onDeleteFolder={deleteFolder}
               onDeleteTag={deleteTag}
+              onDropBook={onDropBookOnFolder}
             />
           </div>
           <div className={styles.content}>
@@ -252,10 +304,12 @@ export default function LibraryPage() {
                         <BookCard
                           key={b.id}
                           book={b}
+                          folders={folders}
                           subtitle={`${Math.round(b.progress!.progress * 100)}% · ${formatRelativeTime(b.progress!.updatedAt)}`}
                           onOpen={openBook}
                           onDelete={deleteBook}
                           onOrganize={setOrganizingBook}
+                          onSetFolder={setBookFolder}
                         />
                       ))}
                     </div>
@@ -266,7 +320,15 @@ export default function LibraryPage() {
                   <h2 className={styles.sectionTitle}>Recently Added</h2>
                   <div className={styles.row}>
                     {recentlyAdded.map((b) => (
-                      <BookCard key={b.id} book={b} onOpen={openBook} onDelete={deleteBook} onOrganize={setOrganizingBook} />
+                      <BookCard
+                        key={b.id}
+                        book={b}
+                        folders={folders}
+                        onOpen={openBook}
+                        onDelete={deleteBook}
+                        onOrganize={setOrganizingBook}
+                        onSetFolder={setBookFolder}
+                      />
                     ))}
                   </div>
                 </section>
@@ -275,7 +337,15 @@ export default function LibraryPage() {
                   <h2 className={styles.sectionTitle}>All Books</h2>
                   <div className={styles.grid}>
                     {allBooks.map((b) => (
-                      <BookCard key={b.id} book={b} onOpen={openBook} onDelete={deleteBook} onOrganize={setOrganizingBook} />
+                      <BookCard
+                        key={b.id}
+                        book={b}
+                        folders={folders}
+                        onOpen={openBook}
+                        onDelete={deleteBook}
+                        onOrganize={setOrganizingBook}
+                        onSetFolder={setBookFolder}
+                      />
                     ))}
                   </div>
                 </section>
@@ -288,7 +358,15 @@ export default function LibraryPage() {
                 ) : (
                   <div className={styles.grid}>
                     {filteredBooks.map((b) => (
-                      <BookCard key={b.id} book={b} onOpen={openBook} onDelete={deleteBook} onOrganize={setOrganizingBook} />
+                      <BookCard
+                        key={b.id}
+                        book={b}
+                        folders={folders}
+                        onOpen={openBook}
+                        onDelete={deleteBook}
+                        onOrganize={setOrganizingBook}
+                        onSetFolder={setBookFolder}
+                      />
                     ))}
                   </div>
                 )}

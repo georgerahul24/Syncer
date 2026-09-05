@@ -46,7 +46,11 @@ export default function EpubReader({
   const appliedRevisionRef = useRef<number | null>(null);
   const appliedRemoteRevisionRef = useRef<number | null>(null);
   const highlightsRef = useRef<Set<string>>(new Set());
-  const modeRef = useRef(settings.mode);
+  // The last known reading location, regardless of source (user scroll,
+  // TOC click, remote update) — used to redisplay at the right spot when
+  // the rendition is recreated for a mode switch (see the manager-swap
+  // comment below), as opposed to jumping back to initialPosition.
+  const currentCfiRef = useRef<string | null>(null);
 
   // ==========================================================================
   // LOOP PREVENTION — read before touching relocation logic.
@@ -59,8 +63,9 @@ export default function EpubReader({
   //     "what the server already knows") must NOT be republished — doing
   //     so would create exactly the sync ping-pong described in
   //     backend/src/sync/README.md.
-  //   - the mode-switch redisplay (re-rendering the SAME cfi under a new
-  //     flow) is not a navigation at all and must not be published either.
+  //   - the mode-switch redisplay (the rendition-creation effect below
+  //     redisplays currentCfiRef when it recreates the rendition for a new
+  //     mode) is not a navigation at all and must not be published either.
   //   - an actual user action (next/prev button, TOC click, search jump)
   //     MUST still call onLocalPositionChange — it's a real
   //     LOCAL_USER_ACTION, it just happens to also go through display().
@@ -91,19 +96,32 @@ export default function EpubReader({
     return rendition.display(target);
   }
 
+  // Loads the book itself — deliberately independent of `settings.mode` so
+  // switching reading mode doesn't re-fetch the file or regenerate
+  // locations (see the rendition effect below, which IS mode-dependent).
   useEffect(() => {
     let cancelled = false;
-    setReady(false);
     appliedRevisionRef.current = null;
     appliedRemoteRevisionRef.current = null;
     highlightsRef.current = new Set();
+    currentCfiRef.current = null;
 
     // epub.js's bundled .d.ts mistypes `requestCredentials` as `object`; the
     // actual runtime (book.js) treats it as a plain boolean and sets
     // `xhr.withCredentials` from it — `true` here is correct, just not
     // expressible without the cast. Same-origin requests already send the
     // session cookie by default even without this, but it's cheap insurance.
-    const epubBook = ePub(books.fileUrl(book.id), { requestCredentials: true } as any); // eslint-disable-line @typescript-eslint/no-explicit-any
+    //
+    // `openAs: 'epub'` is required: epub.js's default input-type detection
+    // (Book#determineType) looks at the URL's file extension to decide
+    // whether to fetch-and-unzip a packed archive vs. treat the URL as an
+    // already-exploded directory of files. Our book URL is
+    // `/api/books/:id/file` — no `.epub` extension — so without this it
+    // silently falls back to "directory" mode and tries to GET individual
+    // paths like `META-INF/container.xml` relative to that URL (all 404),
+    // and the book never finishes loading (stuck on "Opening book…"
+    // forever, since that failure isn't a rejection epub.js surfaces).
+    const epubBook = ePub(books.fileUrl(book.id), { openAs: 'epub', requestCredentials: true } as any); // eslint-disable-line @typescript-eslint/no-explicit-any
     epubBookRef.current = epubBook;
     setBookForSearch(epubBook);
 
@@ -116,14 +134,45 @@ export default function EpubReader({
     // Generating locations walks the entire book's text for accurate %
     // progress — done lazily after opening so it never blocks first paint,
     // and its result is used opportunistically once available (see the
-    // 'relocated' handler below).
+    // 'relocated' handler in the rendition effect below).
     epubBook.ready.then(() => epubBook.locations.generate(1600)).catch(() => {});
 
-    if (!containerRef.current) return;
+    epubBook.opened.catch(() => {
+      if (!cancelled) onError('This EPUB could not be opened. It may be corrupted or invalid.');
+    });
+
+    return () => {
+      cancelled = true;
+      epubBook.destroy();
+      epubBookRef.current = null;
+    };
+  }, [book.id]);
+
+  // Creates the rendition. Depends on `settings.mode` too — NOT just to
+  // change layout (that alone could use rendition.flow() live) but because
+  // epub.js's `manager` (below) can only be chosen at construction time, so
+  // a mode switch has to tear down and recreate the whole rendition.
+  useEffect(() => {
+    const epubBook = epubBookRef.current;
+    if (!epubBook || !containerRef.current) return;
+    let cancelled = false;
+    setReady(false);
+
     const rendition = epubBook.renderTo(containerRef.current, {
       width: '100%',
       height: '100%',
-      flow: modeRef.current === 'paginated' ? 'paginated' : 'scrolled-doc',
+      flow: settings.mode === 'paginated' ? 'paginated' : 'scrolled-doc',
+      // epub.js's default manager only makes the CURRENT section scrollable
+      // internally — it never advances to the next section as you reach
+      // the bottom, so continuous mode looked completely stuck once you
+      // scrolled to the end of a chapter (TOC navigation worked fine since
+      // that goes through display() directly, bypassing this entirely).
+      // The 'continuous' manager is what actually chains sections together
+      // into one seamless scroll. Paginated mode keeps the default manager
+      // (continuous doesn't apply — it's a scroll-only concept), and since
+      // `manager` can't be changed on a live rendition, a mode switch needs
+      // this whole effect to re-run and rebuild the rendition from scratch.
+      manager: settings.mode === 'paginated' ? 'default' : 'continuous',
       allowScriptedContent: false,
     });
     renditionRef.current = rendition;
@@ -134,6 +183,7 @@ export default function EpubReader({
       const cfi = location.start.cfi;
       const href = location.start.href;
       currentHrefRef.current = href;
+      currentCfiRef.current = cfi;
       let pct = location.start.percentage ?? 0;
       try {
         if (epubBook.locations.length() > 0) pct = epubBook.locations.percentageFromCfi(cfi);
@@ -185,7 +235,7 @@ export default function EpubReader({
     // source), so this fires regardless of whether focus is on the outer
     // page or inside the currently-rendered chapter content.
     rendition.on('keydown', (e: KeyboardEvent) => {
-      if (modeRef.current !== 'paginated') return;
+      if (settings.mode !== 'paginated') return;
       if (e.key === 'ArrowRight' || e.key === 'PageDown') {
         discreteRef.current = true;
         rendition.next();
@@ -202,7 +252,7 @@ export default function EpubReader({
       touchStartX = e.changedTouches[0]?.clientX ?? null;
     });
     rendition.on('touchend', (e: TouchEvent) => {
-      if (touchStartX == null || modeRef.current !== 'paginated') return;
+      if (touchStartX == null || settings.mode !== 'paginated') return;
       const dx = (e.changedTouches[0]?.clientX ?? touchStartX) - touchStartX;
       touchStartX = null;
       const SWIPE_THRESHOLD = 40;
@@ -219,15 +269,15 @@ export default function EpubReader({
       if (!cancelled) onError('This book could not be displayed. It may use unsupported EPUB features.');
     });
 
-    epubBook.opened.catch(() => {
-      if (!cancelled) onError('This EPUB could not be opened. It may be corrupted or invalid.');
-    });
-
+    // Redisplay wherever the user actually was (currentCfiRef) across a
+    // mode-switch recreation; only a brand-new mount (nothing read yet)
+    // falls back to the authoritative initialPosition.
+    const startCfi = currentCfiRef.current ?? (initialPosition ? (initialPosition.location as EpubLocation).cfi : undefined);
     epubBook.ready
-      .then(() => programmaticDisplay(rendition, initialPosition ? (initialPosition.location as EpubLocation).cfi : undefined))
+      .then(() => programmaticDisplay(rendition, startCfi))
       .then(() => {
         if (cancelled) return;
-        if (initialPosition) appliedRevisionRef.current = initialPosition.revision;
+        if (initialPosition && !currentCfiRef.current) appliedRevisionRef.current = initialPosition.revision;
         setReady(true);
       })
       .catch(() => {
@@ -237,12 +287,10 @@ export default function EpubReader({
     return () => {
       cancelled = true;
       rendition.destroy();
-      epubBook.destroy();
       renditionRef.current = null;
-      epubBookRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [book.id]);
+  }, [book.id, settings.mode]);
 
   // A later authoritative position (e.g. after a reconnect reconciles state)
   // arrives with a new `revision` — jump to it once, not on every render.
@@ -264,18 +312,6 @@ export default function EpubReader({
     if (!ready || !renditionRef.current) return;
     applyAppearance(renditionRef.current, settings);
   }, [ready, settings.theme, settings.fontFamily, settings.fontSize, settings.lineHeight, settings.margin, settings.readingWidth]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  useEffect(() => {
-    const rendition = renditionRef.current;
-    if (!ready || !rendition || modeRef.current === settings.mode) return;
-    modeRef.current = settings.mode;
-    const current = rendition.currentLocation() as unknown as { start?: { cfi: string } } | undefined;
-    const cfi = current?.start?.cfi;
-    rendition.flow(settings.mode === 'paginated' ? 'paginated' : 'scrolled-doc');
-    // Re-rendering the current location under a new layout isn't a
-    // navigation — it must not be published as a position change.
-    if (cfi) programmaticDisplay(rendition, cfi);
-  }, [ready, settings.mode]);
 
   useEffect(() => {
     if (!outlineTarget || !renditionRef.current) return;
@@ -372,7 +408,7 @@ export default function EpubReader({
   return (
     <div className={styles.wrap}>
       <div className={styles.viewport}>
-        <div ref={containerRef} className={styles.container} />
+        <div ref={containerRef} className={`${styles.container} ${settings.mode === 'continuous' ? styles.containerScrolled : ''}`} />
         {!ready && <div className={styles.centered}>Opening book…</div>}
         {ready && settings.mode === 'paginated' && (
           <>
