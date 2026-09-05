@@ -1,0 +1,99 @@
+.wrap {
+  position: relative;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--pdf-chrome-bg, var(--color-bg));
+}
+
+.wrap[data-theme='sepia'] {
+  --pdf-chrome-bg: #ece2ca;
+}
+
+.wrap[data-theme='dark'] {
+  --pdf-chrome-bg: #0f0f10;
+}
+
+.scrollArea {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: var(--space-7) var(--space-5);
+  scroll-behavior: auto;
+}
+
+.pageList {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.paginatedViewport {
+  flex: 1;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.navZone {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 20%;
+  min-width: 44px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+.navZoneLeft {
+  left: 0;
+}
+
+.navZoneRight {
+  right: 0;
+}
+
+.centered {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-secondary);
+}
+
+.progressRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-5) calc(var(--space-2) + env(safe-area-inset-bottom));
+  transition: opacity var(--transition-medium);
+}
+
+.progressHidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.progressTrack {
+  flex: 1;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--color-border);
+  overflow: hidden;
+}
+
+.progressFill {
+  height: 100%;
+  background: var(--color-accent);
+}
+
+.progressLabel {
+  font-size: 0.72rem;
+  color: var(--color-text-secondary);
+  min-width: 70px;
+  text-align: right;
+}

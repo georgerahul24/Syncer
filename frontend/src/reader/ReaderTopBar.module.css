@@ -1,0 +1,119 @@
+.bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: calc(var(--space-3) + env(safe-area-inset-top)) calc(var(--space-5) + env(safe-area-inset-right)) var(--space-3)
+    calc(var(--space-5) + env(safe-area-inset-left));
+  background: linear-gradient(to bottom, var(--color-bg) 60%, transparent);
+  transition: opacity var(--transition-medium), transform var(--transition-medium);
+}
+
+.hidden {
+  opacity: 0;
+  transform: translateY(-8px);
+  pointer-events: none;
+}
+
+.backButton {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-sm);
+  flex-shrink: 0;
+}
+
+.title {
+  font-size: 0.85rem;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+
+.syncPill {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
+  flex-shrink: 0;
+}
+
+.syncDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #8ee6a8;
+}
+
+.syncDotPaused {
+  background: var(--color-text-tertiary);
+}
+
+.syncDotReconnecting {
+  background: #f5a623;
+}
+
+.syncAction {
+  color: var(--color-accent);
+  font-weight: 500;
+}
+
+.iconButton {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-sm);
+  flex-shrink: 0;
+  font-size: 0.95rem;
+  position: relative;
+}
+
+.persistentDot {
+  position: fixed;
+  top: calc(12px + env(safe-area-inset-top));
+  right: calc(12px + env(safe-area-inset-right));
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #8ee6a8;
+  z-index: 25;
+  box-shadow: 0 0 0 2px var(--color-bg);
+}
+
+.persistentDotPaused {
+  background: var(--color-text-tertiary);
+}
+
+.persistentDotReconnecting {
+  background: #f5a623;
+}
+
+@media (max-width: 640px) {
+  .bar {
+    padding: var(--space-3);
+  }
+  .syncPill span:not(.syncDot) {
+    display: none;
+  }
+}

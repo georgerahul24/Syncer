@@ -1,0 +1,28 @@
+{
+  "name": "syncer",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Self-hosted PDF + EPUB reader with cross-device sync",
+  "engines": {
+    "node": ">=20"
+  },
+  "workspaces": [
+    "backend",
+    "frontend"
+  ],
+  "scripts": {
+    "build": "npm run build -w backend && npm run build -w frontend",
+    "start": "node backend/dist/index.js",
+    "dev:backend": "npm run dev -w backend",
+    "dev:frontend": "npm run dev -w frontend",
+    "test": "npm run test -w backend"
+  },
+  "allowScripts": {
+    "better-sqlite3@11.10.0": true,
+    "esbuild@0.28.2": true,
+    "esbuild@0.25.12": true,
+    "fsevents@2.3.3": true,
+    "core-js@3.50.0": true,
+    "es5-ext@0.10.64": true
+  }
+}

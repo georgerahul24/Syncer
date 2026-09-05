@@ -1,0 +1,122 @@
+.sidebar {
+  padding: var(--space-6) var(--space-4) var(--space-6) 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 6px var(--space-3);
+  border-radius: var(--radius-sm);
+  font-size: 0.85rem;
+  color: var(--color-text-secondary);
+  text-align: left;
+  width: 100%;
+}
+
+.item:hover {
+  background: var(--color-surface-raised);
+}
+
+.itemActive {
+  background: var(--color-surface-raised);
+  color: var(--color-text);
+  font-weight: 500;
+}
+
+.itemLabel {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.count {
+  font-size: 0.72rem;
+  color: var(--color-text-tertiary);
+}
+
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-4) var(--space-3) var(--space-1);
+}
+
+.sectionTitle {
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-text-tertiary);
+}
+
+.addButton {
+  color: var(--color-text-tertiary);
+  font-size: 0.95rem;
+  line-height: 1;
+  padding: 2px 4px;
+}
+
+.addButton:hover {
+  color: var(--color-accent);
+}
+
+.folderRow {
+  position: relative;
+}
+
+.folderRow:hover .rowActions {
+  opacity: 1;
+}
+
+.rowActions {
+  display: flex;
+  gap: 4px;
+  opacity: 0;
+  transition: opacity var(--transition-fast);
+}
+
+.rowActionButton {
+  font-size: 0.75rem;
+  color: var(--color-text-tertiary);
+  padding: 2px;
+}
+
+.rowActionButton:hover {
+  color: var(--color-text);
+}
+
+.inlineInput {
+  flex: 1;
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius-sm);
+  padding: 3px 6px;
+  font-size: 0.85rem;
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+
+.tagCloud {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 0 var(--space-3);
+}
+
+.tagPill {
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  background: var(--color-surface-raised);
+  color: var(--color-text-secondary);
+  border: 1px solid transparent;
+}
+
+.tagPillActive {
+  background: var(--color-accent);
+  color: var(--color-accent-contrast);
+}

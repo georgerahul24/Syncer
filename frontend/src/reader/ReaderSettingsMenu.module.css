@@ -1,0 +1,93 @@
+.panel {
+  position: fixed;
+  top: 60px;
+  right: var(--space-5);
+  width: 280px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  padding: var(--space-4);
+  z-index: 50;
+}
+
+.group {
+  margin-bottom: var(--space-4);
+}
+
+.group:last-child {
+  margin-bottom: 0;
+}
+
+.label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+  margin-bottom: var(--space-2);
+}
+
+.segmented {
+  display: flex;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.segmented button {
+  flex: 1;
+  padding: 6px 0;
+  font-size: 0.8rem;
+  text-align: center;
+  background: var(--color-bg);
+}
+
+.segmented button + button {
+  border-left: 1px solid var(--color-border);
+}
+
+.segmentedActive {
+  background: var(--color-accent) !important;
+  color: var(--color-accent-contrast);
+}
+
+.stepperRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.stepper {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.stepper button {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 1px solid var(--color-border-strong);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.9rem;
+}
+
+.stepperValue {
+  font-size: 0.8rem;
+  min-width: 32px;
+  text-align: center;
+  color: var(--color-text-secondary);
+}
+
+.select {
+  width: 100%;
+  padding: 6px 8px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border-strong);
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-size: 0.85rem;
+}

@@ -1,0 +1,58 @@
+.page {
+  position: relative;
+  margin: 0 auto var(--space-4);
+  background: #fff;
+  box-shadow: var(--shadow-sm);
+}
+
+.canvas {
+  display: block;
+}
+
+.textLayer {
+  position: absolute;
+  inset: 0;
+  overflow: clip;
+  opacity: 1;
+  line-height: 1;
+  text-size-adjust: none;
+  transform-origin: 0 0;
+  z-index: 1;
+}
+
+.textLayer :is(span, br) {
+  color: transparent;
+  position: absolute;
+  white-space: pre;
+  cursor: text;
+  transform-origin: 0% 0%;
+}
+
+.textLayer ::selection {
+  background: var(--color-highlight-blue);
+  opacity: 0.4;
+}
+
+.highlight {
+  position: absolute;
+  pointer-events: none;
+  mix-blend-mode: multiply;
+  opacity: 0.45;
+}
+
+.highlightFocused {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+}
+
+.searchMatch {
+  position: absolute;
+  pointer-events: none;
+  background: var(--color-highlight-yellow);
+  opacity: 0.5;
+}
+
+.searchMatchActive {
+  background: #ff9d2f;
+  opacity: 0.7;
+}

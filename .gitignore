@@ -1,0 +1,9 @@
+node_modules/
+dist/
+.claude/
+data/library/*
+!data/library/.gitkeep
+data/*.sqlite
+data/*.sqlite-*
+*.log
+.DS_Store

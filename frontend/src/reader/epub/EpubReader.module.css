@@ -1,0 +1,108 @@
+.wrap {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.viewport {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+}
+
+.container {
+  position: absolute;
+  inset: 0;
+}
+
+.container :global(iframe) {
+  border: none;
+}
+
+.centered {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-secondary);
+  font-size: 0.9rem;
+}
+
+.navZone {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 12%;
+  min-width: 32px;
+  max-width: 96px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 5;
+  color: var(--color-text-tertiary);
+  font-size: 1.3rem;
+  opacity: 0;
+  transition: opacity var(--transition-fast);
+}
+
+.navZone:hover,
+.navZone:focus-visible {
+  opacity: 1;
+}
+
+.navZoneLeft {
+  left: 0;
+  background: linear-gradient(to right, var(--color-bg), transparent);
+}
+
+.navZoneRight {
+  right: 0;
+  background: linear-gradient(to left, var(--color-bg), transparent);
+}
+
+.progressRow {
+  position: fixed;
+  left: var(--space-6);
+  right: var(--space-6);
+  bottom: var(--space-3);
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  transition: opacity var(--transition-medium);
+}
+
+.progressHidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.progressTrack {
+  flex: 1;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--color-border);
+  overflow: hidden;
+}
+
+.progressFill {
+  height: 100%;
+  border-radius: 2px;
+  background: var(--color-accent);
+  transition: width var(--transition-fast);
+}
+
+.progressLabel {
+  font-size: 0.72rem;
+  color: var(--color-text-secondary);
+  min-width: 32px;
+  text-align: right;
+}
+
+@media (max-width: 640px) {
+  .navZone {
+    width: 18%;
+  }
+}

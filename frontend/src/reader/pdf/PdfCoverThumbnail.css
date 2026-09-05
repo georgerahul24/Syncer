@@ -1,0 +1,27 @@
+.pdf-cover-thumb {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: var(--color-surface-raised);
+}
+
+.pdf-cover-thumb canvas {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.pdf-cover-thumb-fallback {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2rem;
+  font-weight: 600;
+  color: var(--color-text-tertiary);
+  background: linear-gradient(160deg, var(--color-surface-raised), var(--color-bg));
+}
