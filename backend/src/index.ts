@@ -7,6 +7,6 @@ import { PORT } from './config.js';
 const server = http.createServer(createApp());
 attachWebSocketServer(server);
 
-server.listen(PORT, () => {
-  console.log(`Syncer server listening on http://localhost:${PORT}`);
+server.listen(PORT, '0.0.0.0', () => {
+  console.log(`Syncer server listening on http://0.0.0.0:${PORT} (reachable at http://localhost:${PORT} and from other devices on your network)`);
 });
