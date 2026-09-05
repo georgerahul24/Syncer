@@ -50,8 +50,14 @@
   background: currentColor;
 }
 
-.deleteButton {
+.saveStatus {
   margin-left: auto;
+  font-size: 0.68rem;
+  color: var(--color-text-tertiary, var(--color-text-secondary));
+  white-space: nowrap;
+}
+
+.deleteButton {
   color: var(--color-danger, #d64545) !important;
 }
 

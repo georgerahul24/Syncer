@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
 import { pdfjs } from './pdfjsSetup';
-import type { Annotation, PdfAnnotationLocation } from '../../types';
+import type { Annotation, InkStroke, PdfAnnotationLocation } from '../../types';
+import InkCanvas from './InkCanvas';
 import styles from './PdfPage.module.css';
 
 export interface NormalizedRect {
@@ -39,6 +40,11 @@ export default function PdfPage({
   focusedAnnotationId,
   searchMatches,
   onSelectionCreated,
+  inkStrokes,
+  inkEditable,
+  inkColor,
+  inkWidth,
+  onInkStrokesChange,
 }: {
   doc: PDFDocumentProxy;
   pageNumber: number;
@@ -52,6 +58,12 @@ export default function PdfPage({
   focusedAnnotationId: string | null;
   searchMatches: SearchMatchOnPage[];
   onSelectionCreated: (sel: PendingPdfSelection) => void;
+  /** Ink drawn directly on this page's own content — see PdfReader.tsx's drawMode. */
+  inkStrokes: InkStroke[];
+  inkEditable: boolean;
+  inkColor: string;
+  inkWidth: number;
+  onInkStrokesChange: (page: number, strokes: InkStroke[]) => void;
 }) {
   const rootRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -216,6 +228,18 @@ export default function PdfPage({
             />
           ))
         )}
+      {active && (
+        <InkCanvas
+          className={styles.inkOverlay}
+          width={size.width}
+          height={size.height}
+          strokes={inkStrokes}
+          editable={inkEditable}
+          color={inkColor}
+          penWidth={inkWidth}
+          onStrokesChange={(strokes) => onInkStrokesChange(pageNumber, strokes)}
+        />
+      )}
     </div>
   );
 }

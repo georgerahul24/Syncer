@@ -1,7 +1,7 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { PDFPageProxy } from 'pdfjs-dist';
 import type { ReaderComponentProps } from '../types';
-import type { AnnotationColor, PdfAnnotationLocation, PdfLocation } from '../../types';
+import type { AnnotationColor, InkStroke, PdfAnnotationLocation, PdfLocation } from '../../types';
 import { books } from '../../services/api';
 import { usePdfDocument } from './usePdfDocument';
 import PdfPage, { type PendingPdfSelection, type SearchMatchOnPage } from './PdfPage';
@@ -11,6 +11,7 @@ import type { PdfSearchMatch } from './search';
 import { useReadingSessionTracker } from '../analytics/useReadingSessionTracker';
 import { useNotebookPages } from '../notebook/useNotebookPages';
 import NotebookPageBlock from './NotebookPageBlock';
+import { INK_COLORS, INK_WIDTHS } from './inkConstants';
 import styles from './PdfReader.module.css';
 
 const PRELOAD_MARGIN = '1200px 0px';
@@ -55,17 +56,48 @@ export default function PdfReader({
   useReadingSessionTracker(book.id, numPages ? currentPage / numPages : 0);
 
   // Blank notebook pages (typed text + freehand ink) interleaved between
-  // real PDF pages — continuous mode only (see notebookPagesByAfter below).
+  // real PDF pages — continuous mode only (see notebookPagesByAfter below) —
+  // plus ink drawn directly on top of a real page's own content, which
+  // works in both modes (see overlayByPage below).
   const { pages: notebookPages, create: createNotebookPage, update: updateNotebookPage, remove: removeNotebookPage } = useNotebookPages(book.id);
   const notebookPagesByAfter = useMemo(() => {
     const map = new Map<number, typeof notebookPages>();
     for (const p of notebookPages) {
-      const key = p.location.afterPage;
+      if (p.locationType !== 'pdf-page') continue;
+      const key = (p.location as { afterPage: number }).afterPage;
       if (!map.has(key)) map.set(key, []);
       map.get(key)!.push(p);
     }
     return map;
   }, [notebookPages]);
+  const overlayByPage = useMemo(() => {
+    const map = new Map<number, (typeof notebookPages)[number]>();
+    for (const p of notebookPages) {
+      if (p.locationType !== 'pdf-page-overlay') continue;
+      map.set((p.location as { page: number }).page, p);
+    }
+    return map;
+  }, [notebookPages]);
+
+  // Drawing directly on top of PDF page content — a global mode toggle
+  // (top bar) rather than a per-page toolbar: pointer events on the active
+  // page(s) go to an ink canvas instead of text selection while it's on.
+  const [drawMode, setDrawMode] = useState(false);
+  const [drawColor, setDrawColor] = useState(INK_COLORS[0]);
+  const [drawWidth, setDrawWidth] = useState(INK_WIDTHS[0]);
+
+  function onInkStrokesChange(pageNum: number, strokes: InkStroke[]) {
+    const overlay = overlayByPage.get(pageNum);
+    if (overlay) updateNotebookPage(overlay.id, { strokes });
+    else createNotebookPage({ overlayPage: pageNum }, { strokes });
+  }
+
+  function clearCurrentPageInk() {
+    const overlay = overlayByPage.get(currentPage);
+    if (!overlay || overlay.strokes.length === 0) return;
+    if (!confirm("Clear all drawing on this page? This can't be undone.")) return;
+    updateNotebookPage(overlay.id, { strokes: [] });
+  }
 
   // ==========================================================================
   // LOOP PREVENTION — mirrors the pattern in reader/epub/EpubReader.tsx.
@@ -404,7 +436,7 @@ export default function PdfReader({
           onMouseMove={onActivity}
         >
           <div className={styles.pageList}>
-            <button type="button" className={styles.insertPageButton} onClick={() => createNotebookPage(0)}>
+            <button type="button" className={styles.insertPageButton} onClick={() => createNotebookPage({ afterPage: 0 })}>
               + Notebook page
             </button>
             {(notebookPagesByAfter.get(0) ?? []).map((np) => (
@@ -425,8 +457,13 @@ export default function PdfReader({
                   focusedAnnotationId={focusAnnotationId}
                   searchMatches={searchMatchesFor(page)}
                   onSelectionCreated={setSelection}
+                  inkStrokes={overlayByPage.get(page)?.strokes ?? []}
+                  inkEditable={drawMode}
+                  inkColor={drawColor}
+                  inkWidth={drawWidth}
+                  onInkStrokesChange={onInkStrokesChange}
                 />
-                <button type="button" className={styles.insertPageButton} onClick={() => createNotebookPage(page)}>
+                <button type="button" className={styles.insertPageButton} onClick={() => createNotebookPage({ afterPage: page })}>
                   + Notebook page
                 </button>
                 {(notebookPagesByAfter.get(page) ?? []).map((np) => (
@@ -458,9 +495,57 @@ export default function PdfReader({
             focusedAnnotationId={focusAnnotationId}
             searchMatches={searchMatchesFor(currentPage)}
             onSelectionCreated={setSelection}
+            inkStrokes={overlayByPage.get(currentPage)?.strokes ?? []}
+            inkEditable={drawMode}
+            inkColor={drawColor}
+            inkWidth={drawWidth}
+            onInkStrokesChange={onInkStrokesChange}
           />
-          <button type="button" className={`${styles.navZone} ${styles.navZoneLeft}`} aria-label="Previous page" onClick={() => goToPage(currentPage - 1, { discrete: true })} />
-          <button type="button" className={`${styles.navZone} ${styles.navZoneRight}`} aria-label="Next page" onClick={() => goToPage(currentPage + 1, { discrete: true })} />
+          {!drawMode && (
+            <>
+              <button type="button" className={`${styles.navZone} ${styles.navZoneLeft}`} aria-label="Previous page" onClick={() => goToPage(currentPage - 1, { discrete: true })} />
+              <button type="button" className={`${styles.navZone} ${styles.navZoneRight}`} aria-label="Next page" onClick={() => goToPage(currentPage + 1, { discrete: true })} />
+            </>
+          )}
+        </div>
+      )}
+
+      <button
+        type="button"
+        className={`${styles.drawToggle} ${drawMode ? styles.drawToggleActive : ''} ${controlsVisible ? '' : styles.drawToggleHidden}`}
+        onClick={() => setDrawMode((v) => !v)}
+        aria-label={drawMode ? 'Stop drawing on page' : 'Draw on page'}
+        title={drawMode ? 'Stop drawing on page' : 'Draw on page'}
+      >
+        {drawMode ? '✕' : '🖊'}
+      </button>
+
+      {drawMode && (
+        <div className={styles.drawToolbar}>
+          {INK_COLORS.map((c) => (
+            <button
+              key={c}
+              type="button"
+              className={styles.drawSwatch}
+              style={{ background: c, outline: drawColor === c ? '2px solid var(--color-accent)' : 'none' }}
+              aria-label={`Pen color ${c}`}
+              onClick={() => setDrawColor(c)}
+            />
+          ))}
+          {INK_WIDTHS.map((w) => (
+            <button
+              key={w}
+              type="button"
+              className={drawWidth === w ? styles.drawWidthActive : ''}
+              aria-label={`Pen width ${w}`}
+              onClick={() => setDrawWidth(w)}
+            >
+              <span className={styles.drawWidthDot} style={{ width: w + 2, height: w + 2 }} />
+            </button>
+          ))}
+          <button type="button" onClick={clearCurrentPageInk}>
+            Clear page
+          </button>
         </div>
       )}
 

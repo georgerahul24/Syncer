@@ -57,18 +57,40 @@ notebookRouter.post(
   requireAuth,
   asyncRoute(async (req, res) => {
     const book = getOwnedBook(req.userId!, req.params.bookId);
-    const { afterPage } = req.body ?? {};
-    // afterPage is the anchor real-PDF-page number this blank page is
-    // inserted immediately after; 0 means "before page 1".
-    if (typeof afterPage !== 'number' || afterPage < 0) {
-      throw new AppError(400, 'afterPage must be a non-negative number');
+    const { afterPage, overlayPage, text, strokes } = req.body ?? {};
+
+    let locationType: string;
+    let location: unknown;
+    if (typeof afterPage === 'number' && afterPage >= 0) {
+      // A blank page inserted immediately after real page `afterPage`; 0
+      // means "before page 1". Multiple can exist at the same anchor.
+      locationType = 'pdf-page';
+      location = { afterPage };
+    } else if (typeof overlayPage === 'number' && overlayPage >= 1) {
+      // Ink drawn directly on top of real page `overlayPage`'s own content
+      // — at most one per page, so re-requesting one that already exists
+      // returns it instead of creating a duplicate.
+      locationType = 'pdf-page-overlay';
+      location = { page: overlayPage };
+      const existing = db
+        .prepare(`SELECT * FROM notebook_pages WHERE userId = ? AND bookId = ? AND locationType = 'pdf-page-overlay' AND location = ?`)
+        .get(req.userId, book.id, JSON.stringify(location)) as NotebookPageRow | undefined;
+      if (existing) {
+        res.status(200).json(toDto(existing));
+        return;
+      }
+    } else {
+      throw new AppError(400, 'afterPage or overlayPage is required');
     }
+
     const now = new Date().toISOString();
     const id = randomUUID();
+    const initialText = typeof text === 'string' ? text : '';
+    const initialStrokes = Array.isArray(strokes) ? JSON.stringify(strokes) : '[]';
     db.prepare(
       `INSERT INTO notebook_pages (id, userId, bookId, locationType, location, text, strokes, createdAt, updatedAt)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
-    ).run(id, req.userId, book.id, 'pdf-page', JSON.stringify({ afterPage }), '', '[]', now, now);
+    ).run(id, req.userId, book.id, locationType, JSON.stringify(location), initialText, initialStrokes, now, now);
     res.status(201).json(toDto(getOwnedNotebookPage(req.userId!, id)));
   })
 );

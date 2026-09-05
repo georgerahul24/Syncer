@@ -133,8 +133,8 @@ export const annotations = {
 
 export const notebookPages = {
   list: (bookId: string) => request<NotebookPage[]>(`/books/${bookId}/notebook-pages`),
-  create: (bookId: string, afterPage: number) =>
-    request<NotebookPage>(`/books/${bookId}/notebook-pages`, { method: 'POST', body: JSON.stringify({ afterPage }) }),
+  create: (bookId: string, location: { afterPage: number } | { overlayPage: number }, initial?: { text?: string; strokes?: InkStroke[] }) =>
+    request<NotebookPage>(`/books/${bookId}/notebook-pages`, { method: 'POST', body: JSON.stringify({ ...location, ...initial }) }),
   update: (id: string, patch: { text?: string; strokes?: InkStroke[] }) =>
     request<NotebookPage>(`/notebook-pages/${id}`, { method: 'PUT', body: JSON.stringify(patch) }),
   remove: (id: string) => request<void>(`/notebook-pages/${id}`, { method: 'DELETE' }),

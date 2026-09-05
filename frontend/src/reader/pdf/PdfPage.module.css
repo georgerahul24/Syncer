@@ -63,3 +63,9 @@
   background: #ff9d2f;
   opacity: 0.7;
 }
+
+.inkOverlay {
+  position: absolute;
+  inset: 0;
+  z-index: 3; /* above highlights/search/text-layer; pointer-events gated by InkCanvas's own `editable` prop */
+}

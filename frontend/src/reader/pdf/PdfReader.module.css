@@ -129,3 +129,66 @@
   min-width: 70px;
   text-align: right;
 }
+
+.drawToggle {
+  position: fixed;
+  right: var(--space-4);
+  bottom: calc(var(--space-4) + 40px); /* clears the progress row */
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--color-surface);
+  box-shadow: var(--shadow-md);
+  border: 1px solid var(--color-border);
+  font-size: 1.1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 30;
+  transition: opacity var(--transition-medium, 0.2s);
+}
+
+.drawToggleActive {
+  background: var(--color-accent);
+  color: #fff;
+  border-color: var(--color-accent);
+}
+
+.drawToggleHidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.drawToolbar {
+  position: fixed;
+  right: var(--space-4);
+  bottom: calc(var(--space-4) + 92px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: var(--space-2);
+  background: var(--color-surface);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+  border: 1px solid var(--color-border);
+  z-index: 30;
+}
+
+.drawSwatch {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  padding: 0 !important;
+}
+
+.drawWidthActive {
+  background: var(--color-accent);
+  color: #fff;
+}
+
+.drawWidthDot {
+  display: inline-block;
+  border-radius: 50%;
+  background: currentColor;
+}

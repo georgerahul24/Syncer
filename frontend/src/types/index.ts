@@ -154,7 +154,10 @@ export interface BookStats {
 export interface InkStroke {
   color: string;
   width: number;
-  points: Array<{ x: number; y: number; pressure: number }>;
+  // Uniform pen width, deliberately no pressure — a stylus's light default
+  // pressure vs. a finger/mouse's fixed pressure=1 made the exact same pen
+  // draw pencil-thin on one input and thick on the other.
+  points: Array<{ x: number; y: number }>;
 }
 
 export interface SearchResult {
@@ -172,8 +175,11 @@ export interface SearchResult {
 export interface NotebookPage {
   id: string;
   bookId: string;
-  locationType: 'pdf-page';
-  location: { afterPage: number };
+  // 'pdf-page': a blank page inserted after a given real page.
+  // 'pdf-page-overlay': ink drawn directly on top of a real page's own
+  // content — at most one per page, created lazily on the first stroke.
+  locationType: 'pdf-page' | 'pdf-page-overlay';
+  location: { afterPage: number } | { page: number };
   text: string;
   strokes: InkStroke[];
   createdAt: string;

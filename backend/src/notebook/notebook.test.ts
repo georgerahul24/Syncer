@@ -44,7 +44,7 @@ test('create, list, edit, and delete a notebook page', async () => {
   assert.equal(list.length, 1);
   assert.equal(list[0].id, created.id);
 
-  const strokes = [{ color: '#000', width: 2, points: [{ x: 0, y: 0, pressure: 1 }] }];
+  const strokes = [{ color: '#000', width: 2, points: [{ x: 0, y: 0 }] }];
   const updateRes = await client.put(`/api/notebook-pages/${created.id}`, { text: 'hello', strokes });
   assert.equal(updateRes.status, 200);
   const updated = await updateRes.json();
@@ -60,6 +60,34 @@ test('create, list, edit, and delete a notebook page', async () => {
 test('rejects an invalid afterPage', async () => {
   const { client, book } = await newUserWithBook();
   const res = await client.post(`/api/books/${book.id}/notebook-pages`, { afterPage: -1 });
+  assert.equal(res.status, 400);
+});
+
+test('creating an overlay for a page returns the same row instead of a duplicate', async () => {
+  const { client, book } = await newUserWithBook();
+  const strokeA = [{ color: '#000', width: 2, points: [{ x: 0, y: 0 }, { x: 0.1, y: 0.1 }] }];
+
+  const first = await (await client.post(`/api/books/${book.id}/notebook-pages`, { overlayPage: 1, strokes: strokeA })).json();
+  assert.deepEqual(first.location, { page: 1 });
+  assert.equal(first.locationType, 'pdf-page-overlay');
+  assert.deepEqual(first.strokes, strokeA);
+
+  // A second create for the same page — as the "no overlay row exists yet"
+  // path in the frontend would do on a fresh stroke — must return the
+  // EXISTING row (200), not insert a duplicate (201).
+  const secondRes = await client.post(`/api/books/${book.id}/notebook-pages`, { overlayPage: 1 });
+  assert.equal(secondRes.status, 200);
+  const second = await secondRes.json();
+  assert.equal(second.id, first.id);
+  assert.deepEqual(second.strokes, strokeA, 'must return the existing content, not reset it');
+
+  const list = await (await client.get(`/api/books/${book.id}/notebook-pages`)).json();
+  assert.equal(list.length, 1, 'no duplicate overlay row was created');
+});
+
+test('rejects a request with neither afterPage nor overlayPage', async () => {
+  const { client, book } = await newUserWithBook();
+  const res = await client.post(`/api/books/${book.id}/notebook-pages`, {});
   assert.equal(res.status, 400);
 });
 
