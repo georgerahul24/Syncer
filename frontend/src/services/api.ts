@@ -1,4 +1,4 @@
-import type { Annotation, Book, BookStats, Folder, NewAnnotationInput, OverviewStats, ReadingPosition, Tag, User } from '../types';
+import type { Annotation, Book, BookStats, Folder, InkStroke, NewAnnotationInput, NotebookPage, OverviewStats, ReadingPosition, Tag, User } from '../types';
 
 export class ApiError extends Error {
   status: number;
@@ -127,4 +127,13 @@ export const annotations = {
   update: (id: string, patch: { color?: string; note?: string | null }) =>
     request<Annotation>(`/annotations/${id}`, { method: 'PUT', body: JSON.stringify(patch) }),
   remove: (id: string) => request<void>(`/annotations/${id}`, { method: 'DELETE' }),
+};
+
+export const notebookPages = {
+  list: (bookId: string) => request<NotebookPage[]>(`/books/${bookId}/notebook-pages`),
+  create: (bookId: string, afterPage: number) =>
+    request<NotebookPage>(`/books/${bookId}/notebook-pages`, { method: 'POST', body: JSON.stringify({ afterPage }) }),
+  update: (id: string, patch: { text?: string; strokes?: InkStroke[] }) =>
+    request<NotebookPage>(`/notebook-pages/${id}`, { method: 'PUT', body: JSON.stringify(patch) }),
+  remove: (id: string) => request<void>(`/notebook-pages/${id}`, { method: 'DELETE' }),
 };

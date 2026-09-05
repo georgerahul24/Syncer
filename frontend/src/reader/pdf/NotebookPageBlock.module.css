@@ -1,0 +1,85 @@
+.page {
+  position: relative;
+  margin: 0 auto var(--space-4);
+  background: #fdfdfb;
+  box-shadow: var(--shadow-sm);
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 6px var(--space-3);
+  background: var(--color-bg);
+  border-bottom: 1px solid var(--color-border);
+  flex-wrap: wrap;
+}
+
+.modeGroup,
+.penGroup {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.toolbar button {
+  font-size: 0.78rem;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm, 6px);
+  color: var(--color-text-secondary);
+}
+
+.modeActive {
+  background: var(--color-accent);
+  color: #fff !important;
+}
+
+.swatch {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  padding: 0 !important;
+}
+
+.widthDot {
+  display: inline-block;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.deleteButton {
+  margin-left: auto;
+  color: var(--color-danger, #d64545) !important;
+}
+
+.canvasWrap {
+  position: relative;
+}
+
+.textarea {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border: none;
+  resize: none;
+  background: transparent;
+  font: inherit;
+  font-size: 0.95rem;
+  line-height: 1.5;
+  color: var(--color-text);
+  padding: var(--space-3);
+}
+
+.textarea:focus {
+  outline: none;
+}
+
+.canvas {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  touch-action: none;
+}

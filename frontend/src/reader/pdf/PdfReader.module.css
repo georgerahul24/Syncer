@@ -28,6 +28,29 @@
   align-items: center;
 }
 
+.insertPageButton {
+  width: 100%;
+  max-width: 300px;
+  margin: 2px 0;
+  padding: 3px 0;
+  font-size: 0.7rem;
+  color: var(--color-text-tertiary, var(--color-text-secondary));
+  border: 1px dashed transparent;
+  border-radius: var(--radius-sm, 6px);
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.pageList:hover .insertPageButton {
+  opacity: 0.6;
+}
+
+.insertPageButton:hover {
+  opacity: 1 !important;
+  border-color: var(--color-border-strong);
+  background: var(--color-bg);
+}
+
 .paginatedViewport {
   flex: 1;
   position: relative;

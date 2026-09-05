@@ -146,3 +146,20 @@ export interface BookStats {
   lastReadAt: string | null;
   isEstimate: { estimatedCharactersRead: boolean; pagesRead: boolean };
 }
+
+export interface InkStroke {
+  color: string;
+  width: number;
+  points: Array<{ x: number; y: number; pressure: number }>;
+}
+
+export interface NotebookPage {
+  id: string;
+  bookId: string;
+  locationType: 'pdf-page';
+  location: { afterPage: number };
+  text: string;
+  strokes: InkStroke[];
+  createdAt: string;
+  updatedAt: string;
+}

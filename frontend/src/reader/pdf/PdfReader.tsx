@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { PDFPageProxy } from 'pdfjs-dist';
 import type { ReaderComponentProps } from '../types';
 import type { AnnotationColor, PdfAnnotationLocation, PdfLocation } from '../../types';
@@ -9,6 +9,8 @@ import HighlightPopup from './HighlightPopup';
 import PdfSearchOverlay, { type PdfSearchResult } from './PdfSearchOverlay';
 import type { PdfSearchMatch } from './search';
 import { useReadingSessionTracker } from '../analytics/useReadingSessionTracker';
+import { useNotebookPages } from '../notebook/useNotebookPages';
+import NotebookPageBlock from './NotebookPageBlock';
 import styles from './PdfReader.module.css';
 
 const PRELOAD_MARGIN = '1200px 0px';
@@ -51,6 +53,19 @@ export default function PdfReader({
   const ready = !!doc && !!basePageSize;
 
   useReadingSessionTracker(book.id, numPages ? currentPage / numPages : 0);
+
+  // Blank notebook pages (typed text + freehand ink) interleaved between
+  // real PDF pages — continuous mode only (see notebookPagesByAfter below).
+  const { pages: notebookPages, create: createNotebookPage, update: updateNotebookPage, remove: removeNotebookPage } = useNotebookPages(book.id);
+  const notebookPagesByAfter = useMemo(() => {
+    const map = new Map<number, typeof notebookPages>();
+    for (const p of notebookPages) {
+      const key = p.location.afterPage;
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(p);
+    }
+    return map;
+  }, [notebookPages]);
 
   // ==========================================================================
   // LOOP PREVENTION — mirrors the pattern in reader/epub/EpubReader.tsx.
@@ -385,22 +400,35 @@ export default function PdfReader({
           onMouseMove={onActivity}
         >
           <div className={styles.pageList}>
+            <button type="button" className={styles.insertPageButton} onClick={() => createNotebookPage(0)}>
+              + Notebook page
+            </button>
+            {(notebookPagesByAfter.get(0) ?? []).map((np) => (
+              <NotebookPageBlock key={np.id} page={np} width={placeholderWidth} height={placeholderHeight} onUpdate={updateNotebookPage} onDelete={removeNotebookPage} />
+            ))}
             {Array.from({ length: numPages }, (_, i) => i + 1).map((page) => (
-              <PdfPage
-                key={page}
-                doc={doc!}
-                pageNumber={page}
-                scale={scale}
-                active={activePages.has(page)}
-                placeholderWidth={placeholderWidth}
-                placeholderHeight={placeholderHeight}
-                onMeasured={handleMeasured}
-                registerNode={registerNode}
-                highlights={highlightsByPage.get(page) ?? []}
-                focusedAnnotationId={focusAnnotationId}
-                searchMatches={searchMatchesFor(page)}
-                onSelectionCreated={setSelection}
-              />
+              <Fragment key={page}>
+                <PdfPage
+                  doc={doc!}
+                  pageNumber={page}
+                  scale={scale}
+                  active={activePages.has(page)}
+                  placeholderWidth={placeholderWidth}
+                  placeholderHeight={placeholderHeight}
+                  onMeasured={handleMeasured}
+                  registerNode={registerNode}
+                  highlights={highlightsByPage.get(page) ?? []}
+                  focusedAnnotationId={focusAnnotationId}
+                  searchMatches={searchMatchesFor(page)}
+                  onSelectionCreated={setSelection}
+                />
+                <button type="button" className={styles.insertPageButton} onClick={() => createNotebookPage(page)}>
+                  + Notebook page
+                </button>
+                {(notebookPagesByAfter.get(page) ?? []).map((np) => (
+                  <NotebookPageBlock key={np.id} page={np} width={placeholderWidth} height={placeholderHeight} onUpdate={updateNotebookPage} onDelete={removeNotebookPage} />
+                ))}
+              </Fragment>
             ))}
           </div>
         </div>
