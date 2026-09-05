@@ -13,6 +13,7 @@ export default function BookCard({
   onDelete,
   onOrganize,
   onSetFolder,
+  onShowAnalytics,
 }: {
   book: Book;
   subtitle?: string;
@@ -21,6 +22,7 @@ export default function BookCard({
   onDelete: (book: Book) => void;
   onOrganize: (book: Book) => void;
   onSetFolder: (book: Book, folderId: string | null) => void;
+  onShowAnalytics: (book: Book) => void;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [moveMenuOpen, setMoveMenuOpen] = useState(false);
@@ -86,6 +88,15 @@ export default function BookCard({
                   }}
                 >
                   Organize…
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    closeMenus();
+                    onShowAnalytics(book);
+                  }}
+                >
+                  Analytics for this book
                 </button>
                 <button type="button" className={styles.menuDanger} onClick={() => onDelete(book)}>
                   Delete book

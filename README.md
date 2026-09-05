@@ -19,11 +19,17 @@ of book files — no Docker, no external database, no cloud dependency.
   jump back to it from a filterable annotation panel. Positions are stored
   independent of zoom/screen size (normalized rects for PDF, CFI ranges for
   EPUB), so they never drift.
-- **In-book search** across PDF and EPUB text, with a virtualized PDF
-  renderer that stays fast on 1000+ page documents (only nearby pages are
-  ever rendered).
-- **Folders and tags** to organize a large library, plus reading-progress
-  sections (Continue Reading / Recently Added / All Books).
+- **In-book search** across PDF and EPUB text *and* your own highlights/notes,
+  with a virtualized PDF renderer that stays fast on 1000+ page documents
+  (only nearby pages are ever rendered).
+- **Folders and tags** to organize a large library, with drag-and-drop —
+  drag books onto a folder in the sidebar, or drag files from your OS
+  straight onto the library to upload them — plus reading-progress sections
+  (Continue Reading / Recently Added / All Books).
+- **Reading analytics dashboard** — time read, pages/characters read
+  (estimated), average session length, and a day streak, both overall and
+  per book. No third-party analytics; everything is computed from your own
+  local reading-session log.
 - **Real accounts**, scrypt-hashed passwords, per-resource ownership checks
   — this is a multi-user app, not a single-user tool with a login screen
   bolted on.

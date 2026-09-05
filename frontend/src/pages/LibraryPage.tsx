@@ -6,6 +6,7 @@ import type { Book, Folder, Tag } from '../types';
 import BookCard from '../components/BookCard';
 import LibrarySidebar, { type LibraryFilter } from '../components/LibrarySidebar';
 import OrganizeBookDialog from '../components/OrganizeBookDialog';
+import BookAnalyticsDialog from '../components/BookAnalyticsDialog';
 import { formatRelativeTime } from '../utils/time';
 import styles from './LibraryPage.module.css';
 
@@ -17,6 +18,7 @@ export default function LibraryPage() {
   const [tags, setTags] = useState<Tag[]>([]);
   const [filter, setFilter] = useState<LibraryFilter>({ kind: 'all' });
   const [organizingBook, setOrganizingBook] = useState<Book | null>(null);
+  const [analyticsBook, setAnalyticsBook] = useState<Book | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [uploadPct, setUploadPct] = useState<number | null>(null);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
@@ -274,6 +276,9 @@ export default function LibraryPage() {
                   <span>Sync reading position</span>
                   <input type="checkbox" checked={!!user?.syncEnabled} onChange={toggleGlobalSync} />
                 </div>
+                <button type="button" className={styles.logoutButton} onClick={() => navigate('/dashboard')}>
+                  Reading dashboard
+                </button>
                 <button type="button" className={styles.logoutButton} onClick={logout}>
                   Sign out
                 </button>
@@ -322,6 +327,7 @@ export default function LibraryPage() {
                           onDelete={deleteBook}
                           onOrganize={setOrganizingBook}
                           onSetFolder={setBookFolder}
+                          onShowAnalytics={setAnalyticsBook}
                         />
                       ))}
                     </div>
@@ -340,6 +346,7 @@ export default function LibraryPage() {
                         onDelete={deleteBook}
                         onOrganize={setOrganizingBook}
                         onSetFolder={setBookFolder}
+                          onShowAnalytics={setAnalyticsBook}
                       />
                     ))}
                   </div>
@@ -357,6 +364,7 @@ export default function LibraryPage() {
                         onDelete={deleteBook}
                         onOrganize={setOrganizingBook}
                         onSetFolder={setBookFolder}
+                          onShowAnalytics={setAnalyticsBook}
                       />
                     ))}
                   </div>
@@ -378,6 +386,7 @@ export default function LibraryPage() {
                         onDelete={deleteBook}
                         onOrganize={setOrganizingBook}
                         onSetFolder={setBookFolder}
+                          onShowAnalytics={setAnalyticsBook}
                       />
                     ))}
                   </div>
@@ -398,6 +407,8 @@ export default function LibraryPage() {
           onRemoveTag={(tagId) => removeTagFromBook(organizingBook, tagId)}
         />
       )}
+
+      {analyticsBook && <BookAnalyticsDialog book={analyticsBook} onClose={() => setAnalyticsBook(null)} />}
     </div>
   );
 }

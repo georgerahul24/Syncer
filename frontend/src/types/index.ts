@@ -120,3 +120,29 @@ export interface ReaderSettings {
   pdfZoom: number | 'fit-width' | 'fit-page';
   mode: 'continuous' | 'paginated';
 }
+
+export interface OverviewStats {
+  totalSeconds: number;
+  sessionCount: number;
+  booksRead: number;
+  pagesRead: number;
+  estimatedCharactersRead: number;
+  avgSessionSeconds: number;
+  currentStreakDays: number;
+  longestStreakDays: number;
+  firstReadAt: string | null;
+  lastReadAt: string | null;
+  last14Days: Array<{ day: string; seconds: number }>;
+}
+
+export interface BookStats {
+  totalSeconds: number;
+  sessionCount: number;
+  avgSessionSeconds: number;
+  maxProgress: number;
+  pagesRead: number;
+  estimatedCharactersRead: number;
+  firstReadAt: string | null;
+  lastReadAt: string | null;
+  isEstimate: { estimatedCharactersRead: boolean; pagesRead: boolean };
+}

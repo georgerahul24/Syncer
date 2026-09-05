@@ -125,3 +125,41 @@ CREATE TABLE IF NOT EXISTS annotations (
   updatedAt TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_annotations_user_book ON annotations(userId, bookId);
+
+-- A blank page a user inserts into the reading flow to write/draw on, PDF
+-- only for now (see frontend/src/reader/notebook/README.md for why EPUB's
+-- reflowable layout doesn't have a clean equivalent of "between these two
+-- pages" yet). `location` is `{ afterPage: number }`; `strokes` is a JSON
+-- array of `{ color, width, points: [x,y][] }` — small, resolution-
+-- independent vector data, not an image.
+CREATE TABLE IF NOT EXISTS notebook_pages (
+  id TEXT PRIMARY KEY,
+  userId TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  bookId TEXT NOT NULL REFERENCES books(id) ON DELETE CASCADE,
+  locationType TEXT NOT NULL,
+  location TEXT NOT NULL,
+  text TEXT NOT NULL DEFAULT '',
+  strokes TEXT NOT NULL DEFAULT '[]',
+  createdAt TEXT NOT NULL,
+  updatedAt TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_notebook_pages_user_book ON notebook_pages(userId, bookId);
+
+-- One row per completed reading session (see backend/src/analytics/README.md).
+-- Aggregated with SQL SUM/AVG at read time rather than maintaining running
+-- counters — simpler, and leaves room for time-windowed stats later
+-- without needing a different data shape.
+CREATE TABLE IF NOT EXISTS reading_sessions_log (
+  id TEXT PRIMARY KEY,
+  userId TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  bookId TEXT NOT NULL REFERENCES books(id) ON DELETE CASCADE,
+  startedAt TEXT NOT NULL,
+  endedAt TEXT NOT NULL,
+  durationSeconds INTEGER NOT NULL,
+  startProgress REAL NOT NULL,
+  endProgress REAL NOT NULL,
+  pagesRead INTEGER NOT NULL DEFAULT 0,
+  createdAt TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_reading_log_user ON reading_sessions_log(userId);
+CREATE INDEX IF NOT EXISTS idx_reading_log_book ON reading_sessions_log(bookId);

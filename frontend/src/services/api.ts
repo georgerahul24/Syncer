@@ -1,4 +1,4 @@
-import type { Annotation, Book, Folder, NewAnnotationInput, ReadingPosition, Tag, User } from '../types';
+import type { Annotation, Book, BookStats, Folder, NewAnnotationInput, OverviewStats, ReadingPosition, Tag, User } from '../types';
 
 export class ApiError extends Error {
   status: number;
@@ -104,6 +104,19 @@ export const progress = {
   /** Best-effort save on page unload; can't use fetch reliably in that context. */
   beacon: (bookId: string, body: { locationType: string; location: unknown; progress: number }) => {
     navigator.sendBeacon(`/api/books/${bookId}/progress`, new Blob([JSON.stringify(body)], { type: 'application/json' }));
+  },
+};
+
+export const analytics = {
+  overview: () => request<OverviewStats>('/analytics/overview'),
+  forBook: (bookId: string) => request<BookStats>(`/books/${bookId}/analytics`),
+  /** Fire-and-forget: uses sendBeacon (survives page unload) when available, falls back to a plain request. */
+  logSession: (bookId: string, body: { durationSeconds: number; startProgress: number; endProgress: number }) => {
+    const payload = JSON.stringify(body);
+    if (navigator.sendBeacon?.(`/api/books/${bookId}/reading-sessions`, new Blob([payload], { type: 'application/json' }))) {
+      return;
+    }
+    request(`/books/${bookId}/reading-sessions`, { method: 'POST', body: payload }).catch(() => {});
   },
 };
 

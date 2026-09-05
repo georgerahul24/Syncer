@@ -4,6 +4,7 @@ import { useAuth } from './hooks/useAuth';
 import AuthPage from './pages/AuthPage';
 import LibraryPage from './pages/LibraryPage';
 import ReaderPage from './pages/ReaderPage';
+import DashboardPage from './pages/DashboardPage';
 
 export default function App() {
   const { path, navigate } = useRouter();
@@ -26,6 +27,10 @@ export default function App() {
 
   if (bookMatch) {
     return <ReaderPage bookId={bookMatch[1]} />;
+  }
+
+  if (path === '/dashboard') {
+    return <DashboardPage />;
   }
 
   return <LibraryPage />;

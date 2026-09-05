@@ -8,6 +8,7 @@ import { annotationsRouter } from './annotations/routes.js';
 import { foldersRouter } from './folders/routes.js';
 import { tagsRouter } from './tags/routes.js';
 import { shareTargetRouter } from './share/routes.js';
+import { analyticsRouter } from './analytics/routes.js';
 import { errorHandler, notFoundHandler } from './middleware/errors.js';
 import { FRONTEND_DIST } from './config.js';
 
@@ -23,6 +24,7 @@ export function createApp() {
   app.use('/api', annotationsRouter);
   app.use('/api/folders', foldersRouter);
   app.use('/api', tagsRouter);
+  app.use('/api', analyticsRouter);
   app.use(shareTargetRouter);
 
   app.use('/api', notFoundHandler);

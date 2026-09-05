@@ -17,3 +17,12 @@ export function formatRelativeTime(iso: string): string {
   }
   return rtf.format(Math.round(duration), 'years');
 }
+
+/** "3h 24m" / "42m" / "38s" — durations short enough that a full clock format would be overkill. */
+export function formatDuration(totalSeconds: number): string {
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  if (hours > 0) return `${hours}h ${minutes}m`;
+  if (minutes > 0) return `${minutes}m`;
+  return `${Math.round(totalSeconds)}s`;
+}

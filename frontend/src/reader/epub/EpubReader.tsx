@@ -10,6 +10,7 @@ import { registerThemes, applyAppearance } from './themes';
 import { navItemsToToc } from './toc';
 import HighlightPopup, { COLOR_VAR } from './HighlightPopup';
 import EpubSearchOverlay from './EpubSearchOverlay';
+import { useReadingSessionTracker } from '../analytics/useReadingSessionTracker';
 import styles from './EpubReader.module.css';
 
 interface PendingSelection {
@@ -86,6 +87,8 @@ export default function EpubReader({
   const [progress, setProgress] = useState(0);
   const [selection, setSelection] = useState<PendingSelection | null>(null);
   const [bookForSearch, setBookForSearch] = useState<Book | null>(null);
+
+  useReadingSessionTracker(book.id, progress);
 
   function programmaticDisplay(rendition: Rendition, target?: string) {
     suppressRelocateRef.current = true;

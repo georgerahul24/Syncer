@@ -8,6 +8,7 @@ import PdfPage, { type PendingPdfSelection, type SearchMatchOnPage } from './Pdf
 import HighlightPopup from './HighlightPopup';
 import PdfSearchOverlay, { type PdfSearchResult } from './PdfSearchOverlay';
 import type { PdfSearchMatch } from './search';
+import { useReadingSessionTracker } from '../analytics/useReadingSessionTracker';
 import styles from './PdfReader.module.css';
 
 const PRELOAD_MARGIN = '1200px 0px';
@@ -48,6 +49,8 @@ export default function PdfReader({
   // Both the document and page 1's intrinsic size (fetched by a separate
   // effect below) must be ready before pages can actually mount/measure.
   const ready = !!doc && !!basePageSize;
+
+  useReadingSessionTracker(book.id, numPages ? currentPage / numPages : 0);
 
   // ==========================================================================
   // LOOP PREVENTION — mirrors the pattern in reader/epub/EpubReader.tsx.
