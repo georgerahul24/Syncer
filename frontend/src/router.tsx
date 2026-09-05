@@ -25,7 +25,13 @@ export function RouterProvider({ children }: { children: ReactNode }) {
   const navigate = useCallback((to: string, opts?: { replace?: boolean }) => {
     if (opts?.replace) window.history.replaceState(null, '', to);
     else window.history.pushState(null, '', to);
-    setPath(to);
+    // Re-read from the browser rather than trusting `to` verbatim — `path`
+    // is matched elsewhere (App.tsx) as a bare pathname, so a `to` that
+    // carries a query string (e.g. a search-result jump target) must have
+    // it stripped the same way the popstate handler above already does,
+    // or a route regex like /^\/book\/([^/]+)$/ swallows the query string
+    // into its capture group instead of matching it as a separate part.
+    setPath(window.location.pathname);
   }, []);
 
   return <RouterContext.Provider value={{ path, navigate }}>{children}</RouterContext.Provider>;
