@@ -9,6 +9,14 @@ import { analytics } from '../../services/api';
 // "average session length" in the dashboard still means something.
 const FLUSH_INTERVAL_MS = 10 * 60 * 1000;
 const MIN_FLUSH_SECONDS = 10;
+// Both readers restore a resumed position asynchronously after mount (PDF:
+// once the doc + initial position load; EPUB: on the first 'relocated'
+// event), which can jump `progress` from 0 straight to wherever the reader
+// last left off. If the baseline were captured at raw mount time, that
+// instant jump would get misattributed as "pages read" over the next few
+// seconds of real time (e.g. "187 pages in 1 minute"). Waiting this long
+// before locking in the starting progress lets that resume settle first.
+const POSITION_SETTLE_MS = 1500;
 
 /**
  * Tracks active (tab-visible) reading time for the current book and
@@ -26,9 +34,12 @@ export function useReadingSessionTracker(bookId: string, progress: number): void
   progressRef.current = progress;
 
   useEffect(() => {
-    const startProgressRef = { current: progressRef.current };
+    const startProgressRef = { current: null as number | null };
     const activeSecondsRef = { current: 0 };
     const lastTickRef = { current: document.visibilityState === 'visible' ? Date.now() : (null as number | null) };
+    const settleTimer = setTimeout(() => {
+      startProgressRef.current = progressRef.current;
+    }, POSITION_SETTLE_MS);
 
     function tick() {
       if (lastTickRef.current != null) {
@@ -40,7 +51,7 @@ export function useReadingSessionTracker(bookId: string, progress: number): void
     function flush() {
       tick();
       const duration = Math.round(activeSecondsRef.current);
-      if (duration >= MIN_FLUSH_SECONDS) {
+      if (duration >= MIN_FLUSH_SECONDS && startProgressRef.current != null) {
         analytics.logSession(bookId, {
           durationSeconds: duration,
           startProgress: startProgressRef.current,
@@ -65,6 +76,7 @@ export function useReadingSessionTracker(bookId: string, progress: number): void
     const interval = setInterval(flush, FLUSH_INTERVAL_MS);
 
     return () => {
+      clearTimeout(settleTimer);
       flush();
       document.removeEventListener('visibilitychange', onVisibilityChange);
       window.removeEventListener('pagehide', flush);
