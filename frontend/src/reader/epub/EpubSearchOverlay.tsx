@@ -1,10 +1,12 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type Book from 'epubjs/types/book';
+import type { Annotation, EpubAnnotationLocation } from '../../types';
 import styles from './EpubSearchOverlay.module.css';
 
 interface SearchMatch {
   cfi: string;
   excerpt: string;
+  isAnnotation?: boolean;
 }
 
 const MAX_MATCHES = 300;
@@ -15,21 +17,25 @@ const MAX_MATCHES = 300;
  * unloading it immediately after — a large book with hundreds of chapters
  * never has more than one extra chapter DOM in memory at a time, and the
  * UI stays responsive because results stream in incrementally instead of
- * blocking until every chapter is scanned.
+ * blocking until every chapter is scanned. Annotation matches (highlighted
+ * text + notes) are searched separately — a cheap in-memory filter over
+ * the already-loaded `annotations` prop — and shown first.
  */
 export default function EpubSearchOverlay({
   book,
+  annotations,
   open,
   onClose,
   onJump,
 }: {
   book: Book | null;
+  annotations: Annotation[];
   open: boolean;
   onClose: () => void;
   onJump: (cfi: string) => void;
 }) {
   const [query, setQuery] = useState('');
-  const [results, setResults] = useState<SearchMatch[]>([]);
+  const [textResults, setTextResults] = useState<SearchMatch[]>([]);
   const [activeIndex, setActiveIndex] = useState(0);
   const [searching, setSearching] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -39,10 +45,25 @@ export default function EpubSearchOverlay({
     if (open) inputRef.current?.focus();
   }, [open]);
 
+  const annotationResults = useMemo((): SearchMatch[] => {
+    const q = query.trim().toLowerCase();
+    if (!q) return [];
+    return annotations
+      .filter((a) => a.locationType === 'epub')
+      .filter((a) => (a.selectedText ?? '').toLowerCase().includes(q) || (a.note ?? '').toLowerCase().includes(q))
+      .map((a) => ({
+        cfi: (a.location as EpubAnnotationLocation).cfiRange,
+        excerpt: a.note ? `Note: ${a.note}` : `"${a.selectedText}"`,
+        isAnnotation: true,
+      }));
+  }, [annotations, query]);
+
+  const results = useMemo(() => [...annotationResults, ...textResults], [annotationResults, textResults]);
+
   useEffect(() => {
     if (!open || !book) return;
     const generation = ++generationRef.current;
-    setResults([]);
+    setTextResults([]);
     setActiveIndex(0);
     if (!query.trim()) return;
 
@@ -61,7 +82,7 @@ export default function EpubSearchOverlay({
           const matches = section.find(query.trim());
           section.unload();
           collected.push(...matches);
-          if (matches.length) setResults([...collected]);
+          if (matches.length) setTextResults([...collected]);
         } catch {
           // an individual chapter failing to parse shouldn't abort the whole search
         }
@@ -99,7 +120,7 @@ export default function EpubSearchOverlay({
           <>
             <span className={styles.count}>
               {activeIndex + 1} / {results.length}
-              {results.length >= MAX_MATCHES ? '+' : ''}
+              {textResults.length >= MAX_MATCHES ? '+' : ''}
             </span>
             <button type="button" className={styles.navButton} onClick={() => jumpTo((activeIndex - 1 + results.length) % results.length)} aria-label="Previous result">
               ↑
@@ -119,6 +140,7 @@ export default function EpubSearchOverlay({
         )}
         {results.map((r, i) => (
           <button key={r.cfi + i} type="button" className={`${styles.result} ${i === activeIndex ? styles.resultActive : ''}`} onClick={() => jumpTo(i)}>
+            {r.isAnnotation ? '✎ ' : ''}
             {r.excerpt}
           </button>
         ))}

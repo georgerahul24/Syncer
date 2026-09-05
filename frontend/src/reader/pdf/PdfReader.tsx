@@ -6,7 +6,7 @@ import { books } from '../../services/api';
 import { usePdfDocument } from './usePdfDocument';
 import PdfPage, { type PendingPdfSelection, type SearchMatchOnPage } from './PdfPage';
 import HighlightPopup from './HighlightPopup';
-import PdfSearchOverlay from './PdfSearchOverlay';
+import PdfSearchOverlay, { type PdfSearchResult } from './PdfSearchOverlay';
 import type { PdfSearchMatch } from './search';
 import styles from './PdfReader.module.css';
 
@@ -345,8 +345,10 @@ export default function PdfReader({
     setSelection(null);
   }
 
-  function jumpToSearchMatch(match: PdfSearchMatch) {
-    setActiveSearchMatch({ page: match.page, rects: match.rects });
+  function jumpToSearchMatch(match: PdfSearchResult) {
+    if (match.kind === 'text') setActiveSearchMatch({ page: match.page, rects: match.rects });
+    // An annotation match has no rects of its own to overlay (it's already
+    // rendered as a highlight on the page) — just navigate to it.
     goToPage(match.page, { discrete: true });
   }
 
@@ -442,7 +444,7 @@ export default function PdfReader({
         </span>
       </div>
 
-      <PdfSearchOverlay doc={doc} numPages={numPages} open={searchOpen} onClose={() => onSearchOpenChange(false)} onJump={jumpToSearchMatch} />
+      <PdfSearchOverlay doc={doc} numPages={numPages} annotations={annotations} open={searchOpen} onClose={() => onSearchOpenChange(false)} onJump={jumpToSearchMatch} />
     </div>
   );
 }

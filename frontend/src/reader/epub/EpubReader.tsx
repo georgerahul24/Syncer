@@ -446,6 +446,7 @@ export default function EpubReader({
 
       <EpubSearchOverlay
         book={bookForSearch}
+        annotations={annotations}
         open={searchOpen}
         onClose={() => onSearchOpenChange(false)}
         onJump={(cfi) => {
