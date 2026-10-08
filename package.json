@@ -1,0 +1,42 @@
+{
+  "name": "syncer",
+  "private": true,
+  "license": "MIT",
+  "version": "1.0.0",
+  "description": "Self-hosted PDF + EPUB reader with cross-device sync",
+  "engines": {
+    "node": ">=20"
+  },
+  "workspaces": [
+    "backend",
+    "frontend"
+  ],
+  "overrides": {
+    "qs": "6.16.0",
+    "@xmldom/xmldom": "^0.9.12"
+  },
+  "scripts": {
+    "build": "npm run build -w backend && npm run build -w frontend",
+    "start": "node backend/dist/index.js",
+    "dev:backend": "npm run dev -w backend",
+    "dev:frontend": "npm run dev -w frontend",
+    "test": "npm run test -w backend",
+    "tauri": "tauri",
+    "tauri:dev": "tauri dev",
+    "tauri:build": "tauri build",
+    "tauri:android:init": "tauri android init",
+    "tauri:android:dev": "tauri android dev",
+    "tauri:android:build": "tauri android build"
+  },
+  "allowScripts": {
+    "better-sqlite3@11.10.0": true,
+    "esbuild@0.28.2": true,
+    "esbuild@0.25.12": true,
+    "fsevents@2.3.3": true,
+    "core-js@3.50.0": true,
+    "es5-ext@0.10.64": true
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.11.4"
+  }
+}

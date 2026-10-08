@@ -1,0 +1,181 @@
+.wrap {
+  position: relative;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--txt-chrome-bg, var(--color-bg));
+}
+
+/* For plain text the wrapper IS the page, so each reading theme sets the
+   same paper and ink as reader/themes.ts does for EPUB. */
+.wrap[data-theme='light'] {
+  --txt-chrome-bg: #ffffff;
+  color: #1c1c1e;
+}
+
+.wrap[data-theme='sepia'] {
+  --txt-chrome-bg: #f4ecd8;
+  color: #5b4636;
+}
+
+.wrap[data-theme='dark'] {
+  --txt-chrome-bg: #18181a;
+  color: #e8e8ea;
+}
+
+.centered {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--text-sm);
+  opacity: 0.6;
+}
+
+.textarea {
+  flex: 1;
+  width: 100%;
+  height: 100%;
+  border: none;
+  resize: none;
+  background: transparent;
+  color: inherit;
+  max-width: 720px;
+  margin: 0 auto;
+  caret-color: currentColor;
+}
+
+.textarea:focus {
+  outline: none;
+}
+
+.textarea::selection {
+  background: color-mix(in srgb, var(--color-highlight-blue) 55%, transparent);
+}
+
+.statusRow {
+  position: absolute;
+  bottom: calc(var(--space-3) + env(safe-area-inset-bottom));
+  right: calc(var(--space-4) + env(safe-area-inset-right));
+  font-size: var(--text-2xs);
+  color: var(--color-text-tertiary);
+  font-variant-numeric: tabular-nums;
+  opacity: 0.85;
+  transition: opacity var(--transition-medium);
+  pointer-events: none;
+}
+
+.statusHidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Side sheet for in-book search, matching the TOC/annotation sheets. */
+@keyframes sheetIn {
+  from {
+    transform: translateX(24px);
+    opacity: 0;
+  }
+}
+
+.searchPanel {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 340px;
+  max-width: 90vw;
+  background: var(--color-surface);
+  color: var(--color-text);
+  border-left: 1px solid var(--color-border);
+  box-shadow: var(--shadow-lg);
+  display: flex;
+  flex-direction: column;
+  z-index: 20;
+  animation: sheetIn 240ms var(--ease-out);
+}
+
+.searchHeader {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: calc(var(--space-3) + env(safe-area-inset-top)) calc(var(--space-3) + env(safe-area-inset-right)) var(--space-3)
+    var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.searchHeader button {
+  width: 34px;
+  height: 34px;
+  flex: none;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-secondary);
+  transition: background-color var(--transition-fast);
+}
+
+.searchHeader button:hover {
+  background: var(--color-hover);
+  color: var(--color-text);
+}
+
+.searchInput {
+  flex: 1;
+  min-width: 0;
+  height: 38px;
+  padding: 0 12px;
+  border-radius: var(--radius-full);
+  border: 1px solid transparent;
+  background: var(--color-sunken);
+  font-size: 1rem;
+  transition:
+    border-color var(--transition-fast),
+    box-shadow var(--transition-fast);
+}
+
+.searchInput:focus {
+  outline: none;
+  border-color: var(--color-accent);
+  background: var(--color-surface-raised);
+  box-shadow: var(--focus-ring);
+}
+
+.searchResults {
+  flex: 1;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 4px 4px calc(4px + env(safe-area-inset-bottom));
+}
+
+.searchResult {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 10px 12px;
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  border-radius: var(--radius-md);
+  color: var(--color-text-secondary);
+  transition: background-color var(--transition-fast);
+}
+
+.searchResult:active {
+  transform: none;
+}
+
+@media (hover: hover) {
+  .searchResult:hover {
+    background: var(--color-hover);
+    color: var(--color-text);
+  }
+}
+
+.searchEmpty {
+  padding: var(--space-5) var(--space-4);
+  text-align: center;
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+}

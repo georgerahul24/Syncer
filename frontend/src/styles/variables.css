@@ -1,0 +1,153 @@
+/* Design tokens for the app chrome (library, auth, reader controls).
+   Reader content theming (Light/Sepia/Dark, section 32) is a separate,
+   user-chosen concern layered on top by each reader implementation.
+
+   Direction: "paper and ink". Warm off-white paper, ink-dark text, one
+   restrained clothbound-green accent. Every surface is SOLID: no
+   backdrop-filter, no fixed gradient background. Translucent blurred
+   chrome over scrolling content forces the compositor to re-blur on every
+   scroll frame, which is exactly the stutter this system is built to avoid.
+   Depth comes from tone steps and short, soft shadows instead. */
+:root {
+  color-scheme: light;
+
+  /* Paper tones, lightest on top. */
+  --color-bg: #f5f2ec;
+  --color-surface: #fbfaf7;
+  --color-surface-raised: #ffffff;
+  --color-sunken: #ebe6dd;
+  /* Blank book board (covers with no artwork). */
+  --color-cover: #e6e0d4;
+  --color-hover: rgba(60, 45, 20, 0.06);
+
+  /* Ink. */
+  --color-text: #1f1c18;
+  --color-text-secondary: #625b51;
+  --color-text-tertiary: #857d71;
+  --color-border: rgba(60, 45, 20, 0.11);
+  --color-border-strong: rgba(60, 45, 20, 0.2);
+
+  /* Primary actions are set in ink, not in the accent: calmer, and the
+     accent stays meaningful (progress, focus, "you are here"). */
+  --color-ink: #1f1c18;
+  --color-ink-contrast: #fbfaf7;
+
+  /* Clothbound green. Kept by name because reader TSX reads it inline. */
+  --color-accent: #2e6a4f;
+  --color-accent-contrast: #ffffff;
+  --color-accent-soft: rgba(46, 106, 79, 0.12);
+  --color-danger: #b3261e;
+  --color-danger-soft: rgba(179, 38, 30, 0.09);
+  --color-warning: #a86a00;
+  --color-success: #3f9a6c;
+
+  --color-highlight-yellow: #ffd955;
+  --color-highlight-green: #8ee6a8;
+  --color-highlight-blue: #8ec9ff;
+  --color-highlight-pink: #ffb3c7;
+  --color-highlight-purple: #d4b3ff;
+
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
+  --radius-full: 999px;
+
+  /* Shadows always carry an offset and a soft blur, tinted warm. Static
+     only: nothing in the app transitions a shadow. */
+  --shadow-sm: 0 1px 2px rgba(50, 35, 15, 0.08);
+  --shadow-md: 0 2px 4px rgba(50, 35, 15, 0.05), 0 10px 24px -6px rgba(50, 35, 15, 0.16);
+  --shadow-lg: 0 4px 8px rgba(50, 35, 15, 0.06), 0 24px 48px -12px rgba(50, 35, 15, 0.24);
+  --shadow-cover: 0 1px 1px rgba(50, 35, 15, 0.1), 0 8px 16px -8px rgba(50, 35, 15, 0.35);
+
+  --font-ui:
+    -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  /* System serifs only, so nothing loads over the network. Iowan/Charter on
+     Apple, Palatino or Georgia on desktop, Noto Serif on Android. */
+  --font-serif: 'Iowan Old Style', 'Charter', 'Bitstream Charter', 'Palatino Linotype', Palatino, Georgia, 'Noto Serif',
+    serif;
+
+  /* Fixed rem scale (ratio ~1.2), not fluid: this is product UI. */
+  --text-2xs: 0.6875rem;
+  --text-xs: 0.75rem;
+  --text-sm: 0.8125rem;
+  --text-base: 0.9375rem;
+  --text-md: 1.0625rem;
+  --text-lg: 1.3125rem;
+  --text-xl: 1.625rem;
+  --text-2xl: 2rem;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+  --space-8: 64px;
+
+  /* Page gutter, overridden at phone width. */
+  --gutter: 32px;
+
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --duration-fast: 140ms;
+  --duration-base: 200ms;
+  --duration-slow: 300ms;
+
+  --transition-fast: var(--duration-fast) var(--ease-out);
+  --transition-medium: var(--duration-base) var(--ease-out);
+  /* For chrome that slides in from an edge (TOC, annotations, settings). */
+  --transition-spring: var(--duration-slow) var(--ease-out);
+
+  --focus-ring: 0 0 0 3px var(--color-accent-soft);
+}
+
+@media (max-width: 640px) {
+  :root {
+    --gutter: 16px;
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --color-bg: #151412;
+    --color-surface: #1d1b19;
+    --color-surface-raised: #2a2724;
+    /* In dark mode a fill reads as "inset" when it is lighter, not darker. */
+    --color-sunken: rgba(255, 240, 215, 0.07);
+    --color-cover: #2b2825;
+    --color-hover: rgba(255, 240, 215, 0.06);
+    --color-text: #ede8e0;
+    --color-text-secondary: #aaa296;
+    --color-text-tertiary: #7f786e;
+    --color-border: rgba(255, 240, 215, 0.09);
+    --color-border-strong: rgba(255, 240, 215, 0.17);
+    --color-ink: #ede8e0;
+    --color-ink-contrast: #151412;
+    --color-accent: #7cc4a0;
+    --color-accent-contrast: #0f1a14;
+    --color-accent-soft: rgba(124, 196, 160, 0.16);
+    --color-danger: #ff8a80;
+    --color-danger-soft: rgba(255, 138, 128, 0.12);
+    --color-warning: #f0b44c;
+    --color-success: #6fcf97;
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --shadow-md: 0 2px 4px rgba(0, 0, 0, 0.3), 0 12px 28px -6px rgba(0, 0, 0, 0.55);
+    --shadow-lg: 0 4px 8px rgba(0, 0, 0, 0.3), 0 24px 56px -12px rgba(0, 0, 0, 0.7);
+    --shadow-cover: 0 1px 1px rgba(0, 0, 0, 0.4), 0 10px 18px -8px rgba(0, 0, 0, 0.7);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}

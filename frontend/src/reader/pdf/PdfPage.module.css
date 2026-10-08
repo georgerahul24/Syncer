@@ -1,0 +1,74 @@
+.page {
+  position: relative;
+  margin: 0 auto var(--space-4);
+  background: #fff;
+  /* Paper on a desk: a hairline plus a short soft drop. Static. */
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.04),
+    0 2px 6px -2px rgba(0, 0, 0, 0.14);
+  /* Skip layout/paint for pages far outside the viewport — width/height
+     are always set explicitly via inline style, so this can't collapse
+     the box; it just cuts wasted work on long documents. Complements,
+     doesn't replace, the IntersectionObserver-driven canvas mount/unmount
+     in PdfReader.tsx. */
+  content-visibility: auto;
+}
+
+.canvas {
+  display: block;
+  transition: opacity 160ms var(--ease-out);
+}
+
+.textLayer {
+  position: absolute;
+  inset: 0;
+  overflow: clip;
+  opacity: 1;
+  line-height: 1;
+  text-size-adjust: none;
+  transform-origin: 0 0;
+  z-index: 1;
+}
+
+.textLayer :is(span, br) {
+  color: transparent;
+  position: absolute;
+  white-space: pre;
+  cursor: text;
+  transform-origin: 0% 0%;
+}
+
+.textLayer ::selection {
+  background: var(--color-highlight-blue);
+  opacity: 0.4;
+}
+
+.highlight {
+  position: absolute;
+  pointer-events: none;
+  mix-blend-mode: multiply;
+  opacity: 0.45;
+}
+
+.highlightFocused {
+  outline: 2px solid #2e6a4f;
+  outline-offset: 1px;
+}
+
+.searchMatch {
+  position: absolute;
+  pointer-events: none;
+  background: var(--color-highlight-yellow);
+  opacity: 0.5;
+}
+
+.searchMatchActive {
+  background: #ff9d2f;
+  opacity: 0.7;
+}
+
+.inkOverlay {
+  position: absolute;
+  inset: 0;
+  z-index: 3; /* above highlights/search/text-layer; pointer-events gated by InkCanvas's own `editable` prop */
+}

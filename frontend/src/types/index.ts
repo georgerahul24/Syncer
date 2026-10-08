@@ -1,0 +1,187 @@
+export type BookFormat = 'pdf' | 'epub' | 'txt';
+
+export interface User {
+  id: string;
+  email: string;
+  syncEnabled: boolean;
+}
+
+export interface Folder {
+  id: string;
+  name: string;
+  createdAt: string;
+  bookCount: number;
+}
+
+export interface Tag {
+  id: string;
+  name: string;
+  bookCount?: number;
+}
+
+export interface Book {
+  id: string;
+  title: string;
+  author: string | null;
+  format: BookFormat;
+  pageCount: number | null;
+  identifier: string | null;
+  coverUrl: string | null;
+  syncEnabled: boolean;
+  folderId: string | null;
+  tags: Tag[];
+  createdAt: string;
+  updatedAt: string;
+  progress: { progress: number; updatedAt: string } | null;
+}
+
+// Format-specific location payloads. Opaque to everything except the
+// reader that produced them and, for PDF, the annotation overlay.
+export interface PdfLocation {
+  page: number;
+  scrollOffset: number;
+}
+
+export interface EpubLocation {
+  cfi: string;
+  chapterHref: string | null;
+  scrollOffset: number;
+}
+
+export interface TxtLocation {
+  scrollOffset: number; // fraction 0..1 of the textarea's scrollable height
+}
+
+export interface ReadingPosition {
+  locationType: 'pdf-page' | 'epub-cfi' | 'txt';
+  location: PdfLocation | EpubLocation | TxtLocation;
+  progress: number; // 0..1
+  revision: number;
+  updatedAt: string;
+}
+
+export type AnnotationType = 'highlight' | 'note';
+export type AnnotationColor = 'yellow' | 'green' | 'blue' | 'pink' | 'purple';
+
+export interface PdfAnnotationLocation {
+  page: number;
+  // Rects are normalized to [0,1] against the page's own width/height, so
+  // they stay correct across zoom levels and window resizes.
+  rects: Array<{ x: number; y: number; width: number; height: number }>;
+  contextBefore?: string;
+  contextAfter?: string;
+}
+
+export interface EpubAnnotationLocation {
+  cfiRange: string;
+  chapterHref: string | null;
+}
+
+export interface Annotation {
+  id: string;
+  bookId: string;
+  type: AnnotationType;
+  color: AnnotationColor;
+  locationType: 'pdf' | 'epub';
+  location: PdfAnnotationLocation | EpubAnnotationLocation;
+  selectedText: string | null;
+  note: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface NewAnnotationInput {
+  type: AnnotationType;
+  color: AnnotationColor;
+  locationType: 'pdf' | 'epub';
+  location: PdfAnnotationLocation | EpubAnnotationLocation;
+  selectedText?: string;
+  note?: string;
+}
+
+export interface TocItem {
+  label: string;
+  page?: number | null;
+  href?: string;
+  items?: TocItem[];
+}
+
+export type ReaderTheme = 'light' | 'sepia' | 'dark';
+
+export interface ReaderPadding {
+  top: number;
+  right: number;
+  bottom: number;
+  left: number;
+}
+
+export interface ReaderSettings {
+  theme: ReaderTheme;
+  fontFamily: string;
+  fontSize: number; // px, epub only
+  lineHeight: number; // unitless multiplier, epub only
+  padding: ReaderPadding; // px per direction, both formats — user-controlled reading comfort spacing
+  pdfZoom: number | 'fit-width' | 'fit-page';
+  mode: 'continuous' | 'paginated';
+}
+
+export interface OverviewStats {
+  totalSeconds: number;
+  sessionCount: number;
+  booksRead: number;
+  pagesRead: number;
+  estimatedCharactersRead: number;
+  avgSessionSeconds: number;
+  currentStreakDays: number;
+  longestStreakDays: number;
+  firstReadAt: string | null;
+  lastReadAt: string | null;
+  last14Days: Array<{ day: string; seconds: number }>;
+}
+
+export interface BookStats {
+  totalSeconds: number;
+  sessionCount: number;
+  avgSessionSeconds: number;
+  maxProgress: number;
+  pagesRead: number;
+  estimatedCharactersRead: number;
+  firstReadAt: string | null;
+  lastReadAt: string | null;
+  isEstimate: { estimatedCharactersRead: boolean; pagesRead: boolean };
+}
+
+export interface InkStroke {
+  color: string;
+  width: number;
+  // Uniform pen width, deliberately no pressure — a stylus's light default
+  // pressure vs. a finger/mouse's fixed pressure=1 made the exact same pen
+  // draw pencil-thin on one input and thick on the other.
+  points: Array<{ x: number; y: number }>;
+}
+
+export interface SearchResult {
+  bookId: string;
+  bookTitle: string;
+  bookAuthor: string | null;
+  format: BookFormat;
+  kind: 'text' | 'annotation' | 'book';
+  snippet: string;
+  locationType?: 'pdf-page' | 'epub-chapter' | 'txt' | 'pdf' | 'epub';
+  location?: { page?: number; href?: string } & Record<string, unknown>;
+  annotationId?: string;
+}
+
+export interface NotebookPage {
+  id: string;
+  bookId: string;
+  // 'pdf-page': a blank page inserted after a given real page.
+  // 'pdf-page-overlay': ink drawn directly on top of a real page's own
+  // content — at most one per page, created lazily on the first stroke.
+  locationType: 'pdf-page' | 'pdf-page-overlay';
+  location: { afterPage: number } | { page: number };
+  text: string;
+  strokes: InkStroke[];
+  createdAt: string;
+  updatedAt: string;
+}

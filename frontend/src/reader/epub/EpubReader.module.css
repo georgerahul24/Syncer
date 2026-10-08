@@ -1,0 +1,193 @@
+.wrap {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.viewport {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+}
+
+.container {
+  position: absolute;
+  inset: 0;
+}
+
+/* epub.js's 'scrolled-doc' flow renders the current section as ONE iframe
+   sized to its own full content height (not clipped to the viewport) and
+   expects the surrounding element to be an ordinary scrollable container.
+   Without overflow-y here, that over-tall iframe just overflows .container
+   with nothing to scroll it — the book never advances past 0%. Paginated
+   mode does NOT want this (epub.js paginates via CSS columns internally
+   and the container should stay a fixed, non-scrolling viewport), so it's
+   applied conditionally, not on .container itself. */
+.containerScrolled {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* epub.js builds its own scroller inside .container, and that's the element
+   the chapter-crossing rubber band translates. 'none' (not 'contain') is
+   required here: per spec, 'contain' only stops the overscroll from
+   chaining to an ancestor — the browser's own native bounce still plays ON
+   THIS element. On WebKit (Safari/macOS's native app, since Tauri wraps
+   WKWebView there) that native bounce fights our JS-driven slide/opacity
+   reveal for the same gesture — the native elastic snap-back visually wins
+   and un-does the reveal, so scrolling past a chapter boundary looked like
+   it "gave" (the native bounce) but never actually turned the page. 'none'
+   suppresses that native effect entirely, same as it stops Android's
+   pull-to-refresh from firing on the backwards pull at scrollTop 0. */
+.containerScrolled :global(.epub-container) {
+  overscroll-behavior-y: none;
+}
+
+.container :global(iframe) {
+  border: none;
+}
+
+.centered {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+}
+
+/* Chapter-crossing hint. JS sets its text, data-edge, data-ready and an
+   inline opacity (0..1); CSS only places and colours it. Opacity is the
+   only animated property. */
+.pullHint {
+  position: absolute;
+  left: 50%;
+  z-index: 6;
+  transform: translateX(-50%);
+  max-width: calc(100% - 32px);
+  padding: 7px 14px;
+  border-radius: var(--radius-full);
+  background: var(--color-surface-raised);
+  color: var(--color-text-secondary);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-md);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 150ms var(--ease-out);
+}
+
+.pullHint[data-edge='top'] {
+  /* Below the reader top bar, which is usually showing mid-scroll. */
+  top: calc(72px + env(safe-area-inset-top));
+}
+
+.pullHint[data-edge='bottom'],
+.pullHint:not([data-edge]) {
+  /* Above the progress row. */
+  bottom: calc(48px + env(safe-area-inset-bottom));
+}
+
+.pullHint[data-ready='true'] {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: var(--color-accent-contrast);
+  font-weight: 600;
+}
+
+/* Page-turn tap zones at the edges. A chevron fades in on hover; no
+   gradient wash, since the page colour comes from the reading theme and
+   the app chrome cannot know it. */
+.navZone {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 12%;
+  min-width: 32px;
+  max-width: 96px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 5;
+  color: var(--color-text-tertiary);
+  font-size: 1.3rem;
+  opacity: 0;
+  transition: opacity var(--transition-fast);
+}
+
+.navZone:active {
+  transform: none;
+}
+
+@media (hover: hover) {
+  .navZone:hover {
+    opacity: 1;
+  }
+}
+
+.navZone:focus-visible {
+  opacity: 1;
+}
+
+.navZoneLeft {
+  left: 0;
+}
+
+.navZoneRight {
+  right: 0;
+}
+
+.progressRow {
+  position: fixed;
+  left: calc(var(--space-6) + env(safe-area-inset-left));
+  right: calc(var(--space-6) + env(safe-area-inset-right));
+  bottom: calc(var(--space-3) + env(safe-area-inset-bottom));
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  pointer-events: none;
+  transition: opacity var(--transition-medium);
+}
+
+.progressHidden {
+  opacity: 0;
+}
+
+.progressTrack {
+  flex: 1;
+  height: 2px;
+  border-radius: 1px;
+  background: color-mix(in srgb, var(--color-text-tertiary) 30%, transparent);
+  overflow: hidden;
+}
+
+.progressFill {
+  height: 100%;
+  border-radius: 1px;
+  background: var(--color-accent);
+}
+
+.progressLabel {
+  font-size: var(--text-2xs);
+  color: var(--color-text-tertiary);
+  font-variant-numeric: tabular-nums;
+  min-width: 32px;
+  text-align: right;
+}
+
+@media (max-width: 640px) {
+  .navZone {
+    width: 18%;
+  }
+  .progressRow {
+    left: calc(var(--space-4) + env(safe-area-inset-left));
+    right: calc(var(--space-4) + env(safe-area-inset-right));
+  }
+}

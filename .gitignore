@@ -1,0 +1,13 @@
+node_modules/
+dist/
+.claude/
+data/library/*
+!data/library/.gitkeep
+data/*.sqlite
+data/*.sqlite-*
+*.log
+.DS_Store
+data/*.bak-*
+src-tauri/gen/
+.env.local
+.env.*.local

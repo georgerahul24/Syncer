@@ -1,0 +1,268 @@
+.wrap {
+  position: relative;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--pdf-chrome-bg, var(--color-bg));
+}
+
+.wrap[data-theme='sepia'] {
+  --pdf-chrome-bg: #ece2ca;
+}
+
+.wrap[data-theme='dark'] {
+  --pdf-chrome-bg: #0f0f10;
+}
+
+.scrollArea {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  /* padding is set inline per-direction from settings.padding (reader settings menu) */
+  scroll-behavior: auto;
+}
+
+.pageList {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.insertPageButton {
+  width: 100%;
+  max-width: 300px;
+  min-height: 32px; /* comfortable tap target for touch/stylus, not a hover sliver */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 4px 0;
+  padding: 6px 0;
+  font-size: var(--text-xs);
+  color: var(--color-text-tertiary);
+  border: 1px dashed transparent;
+  border-radius: var(--radius-full);
+  /* Always faintly visible: touch and stylus devices have no hover state,
+     and they are the audience for notebook pages. */
+  opacity: 0.4;
+  transition:
+    opacity var(--transition-fast),
+    border-color var(--transition-fast);
+}
+
+.pageList:hover .insertPageButton {
+  opacity: 0.65;
+}
+
+.insertPageButton:hover,
+.insertPageButton:focus-visible {
+  opacity: 1 !important;
+  border-color: var(--color-border-strong);
+}
+
+.paginatedViewport {
+  flex: 1;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+/* Page-turn entrance for paginated mode — see PdfReader.tsx's goToPage.
+   PdfPage is remounted (key={currentPage}) on every turn, and its render
+   is a fast, synchronous canvas draw (no iframe/layout settling like
+   EPUB's — see EpubReader.tsx's crossChapter for why THAT needs to wait
+   for layout before revealing anything), so a mount-triggered CSS
+   animation alone reads as a clean turn with no separate JS orchestration
+   needed. Direction comes from a CSS custom property PdfReader sets per
+   turn, so one keyframe rule covers both directions. */
+@keyframes pageTurnIn {
+  from {
+    opacity: 0;
+    transform: translateX(var(--turn-from, 28px)) scale(0.98);
+  }
+}
+
+.pageTurnWrap {
+  display: contents;
+}
+
+.pageTurnWrap > * {
+  animation: pageTurnIn 260ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.navZone {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 20%;
+  min-width: 44px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+.navZoneLeft {
+  left: 0;
+}
+
+.navZoneRight {
+  right: 0;
+}
+
+.centered {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-secondary);
+}
+
+.progressRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) calc(var(--space-5) + env(safe-area-inset-right)) calc(var(--space-2) + env(safe-area-inset-bottom))
+    calc(var(--space-5) + env(safe-area-inset-left));
+  transition: opacity var(--transition-medium);
+}
+
+.progressHidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.progressTrack {
+  flex: 1;
+  height: 2px;
+  border-radius: 1px;
+  background: color-mix(in srgb, currentColor 14%, transparent);
+  color: var(--color-text-secondary);
+  overflow: hidden;
+}
+
+.wrap[data-theme='dark'] .progressTrack,
+.wrap[data-theme='dark'] .progressLabel {
+  color: #a8a49c;
+}
+
+.wrap[data-theme='sepia'] .progressTrack,
+.wrap[data-theme='sepia'] .progressLabel {
+  color: #7a6450;
+}
+
+.progressFill {
+  height: 100%;
+  background: var(--color-accent);
+}
+
+.progressLabel {
+  font-size: var(--text-2xs);
+  color: var(--color-text-secondary);
+  font-variant-numeric: tabular-nums;
+  min-width: 80px;
+  text-align: right;
+  white-space: nowrap;
+}
+
+/* Floating pen button. Solid, round, sits above the progress row. */
+.drawToggle {
+  position: fixed;
+  right: calc(var(--space-4) + env(safe-area-inset-right));
+  bottom: calc(var(--space-4) + 40px + env(safe-area-inset-bottom)); /* clears the progress row */
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: var(--color-surface-raised);
+  color: var(--color-text);
+  box-shadow: var(--shadow-lg);
+  border: 1px solid var(--color-border);
+  font-size: 1.1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 30;
+  transition:
+    opacity var(--transition-medium),
+    transform 120ms var(--ease-out);
+}
+
+.drawToggleActive {
+  background: var(--color-ink);
+  color: var(--color-ink-contrast);
+  border-color: var(--color-ink);
+}
+
+.drawToggleHidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.drawToolbar {
+  position: fixed;
+  right: calc(var(--space-4) + env(safe-area-inset-right));
+  bottom: calc(var(--space-4) + 100px + env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  width: 48px;
+  padding: 6px 0;
+  background: var(--color-surface-raised);
+  border-radius: var(--radius-full);
+  box-shadow: var(--shadow-lg);
+  border: 1px solid var(--color-border);
+  z-index: 30;
+  transform-origin: bottom center;
+  animation: popIn 180ms var(--ease-out);
+}
+
+.drawToolbar button {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text);
+  font-size: var(--text-2xs);
+  line-height: 1.1;
+  text-align: center;
+  transition: background-color var(--transition-fast);
+}
+
+.drawToolbar button:hover {
+  background: var(--color-hover);
+}
+
+/* "Clear page" is the only text button; let it wrap inside the column. */
+.drawToolbar button:last-child {
+  height: auto;
+  min-height: 36px;
+  padding: 4px 2px;
+  border-radius: var(--radius-md);
+  color: var(--color-text-secondary);
+}
+
+.drawSwatch {
+  width: 24px !important;
+  height: 24px !important;
+  border-radius: 50%;
+  padding: 0 !important;
+  margin: 6px 0;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.15);
+  outline-offset: 2px;
+}
+
+.drawWidthActive,
+.drawWidthActive:hover {
+  background: var(--color-ink) !important;
+  color: var(--color-ink-contrast) !important;
+}
+
+.drawWidthDot {
+  display: inline-block;
+  border-radius: 50%;
+  background: currentColor;
+}

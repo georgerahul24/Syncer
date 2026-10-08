@@ -1,0 +1,91 @@
+.backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(20, 16, 12, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-4);
+  z-index: 70;
+  animation: fadeIn 180ms var(--ease-out);
+}
+
+.dialog {
+  width: 380px;
+  max-width: 100%;
+  max-height: calc(100vh - 2 * var(--space-4));
+  overflow-y: auto;
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-lg);
+  padding: var(--space-5);
+  animation: riseIn 240ms var(--ease-out);
+}
+
+.title {
+  font-family: var(--font-serif);
+  font-size: var(--text-md);
+  font-weight: 600;
+  line-height: 1.3;
+  margin: 0 0 var(--space-5);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* A ledger, not a wall of cards: figures on hairline rules. */
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  column-gap: var(--space-5);
+  margin-bottom: var(--space-5);
+}
+
+.tile {
+  padding: var(--space-3) 0;
+  border-top: 1px solid var(--color-border);
+}
+
+.tileValue {
+  font-family: var(--font-serif);
+  font-size: var(--text-lg);
+  font-weight: 600;
+  line-height: 1.2;
+  color: var(--color-text);
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+.tileLabel {
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+  margin-top: 2px;
+}
+
+.tileNote {
+  font-size: var(--text-2xs);
+  color: var(--color-text-tertiary);
+  font-style: italic;
+}
+
+.empty {
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+  text-align: center;
+  padding: var(--space-5) 0;
+}
+
+.footer {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.doneButton {
+  height: 38px;
+  padding: 0 22px;
+  border-radius: var(--radius-full);
+  background: var(--color-ink);
+  color: var(--color-ink-contrast);
+  font-weight: 600;
+  font-size: var(--text-sm);
+}

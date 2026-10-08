@@ -1,0 +1,89 @@
+/* The visible bar is deliberately tiny, but a 4px tap target is not usable
+   on a phone — so the button is a transparent ~40px band across the top and
+   only the span inside it is painted. */
+.hitArea {
+  position: fixed;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 25;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  width: 128px;
+  height: 40px;
+  padding-top: calc(6px + env(safe-area-inset-top));
+  background: none;
+  border: none;
+  cursor: pointer;
+  transition: opacity var(--duration-base) var(--ease-out);
+}
+
+/* Keep the centring transform on press; the global button:active scale
+   would otherwise replace it and make the handle jump sideways. */
+.hitArea:active {
+  transform: translateX(-50%);
+}
+
+.hitArea:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: -4px;
+  border-radius: 6px;
+}
+
+/* Stepped aside while the full top bar is up — not unmounted, so focus and
+   the fade survive the transition. */
+.hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.bar {
+  width: 36px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--color-success);
+  /* Enough separation to stay legible over a white page or a dark one
+     without needing to know which. */
+  box-shadow: 0 0 0 1px rgb(0 0 0 / 0.12);
+  /* Grows with scaleX, not width, so the hover never triggers layout. */
+  transition:
+    transform var(--duration-fast) var(--ease-out),
+    background-color var(--duration-base) ease;
+}
+
+.hitArea:hover .bar,
+.hitArea:active .bar {
+  transform: scaleX(1.4);
+}
+
+/* Red, not grey: "your place isn't being saved" is worth noticing, and grey
+   reads as decoration rather than state. */
+.off {
+  background: #d9573d;
+}
+
+.reconnecting {
+  background: #e0a23a;
+  animation: handlePulse 1.4s ease-in-out infinite;
+}
+
+@keyframes handlePulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reconnecting {
+    animation: none;
+  }
+  .bar,
+  .hitArea {
+    transition: none;
+  }
+}

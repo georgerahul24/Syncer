@@ -1,0 +1,30 @@
+.pdf-cover-thumb {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: inherit;
+  /* PDF pages are white paper whatever the app theme. */
+  background: #fff;
+}
+
+.pdf-cover-thumb img {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.pdf-cover-thumb-fallback {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-serif);
+  font-size: 2.25rem;
+  font-weight: 500;
+  color: var(--color-text-tertiary);
+  background: var(--color-cover);
+}
