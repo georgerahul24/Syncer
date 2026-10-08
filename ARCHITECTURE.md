@@ -160,10 +160,5 @@ convention.
   directly exploitable — `adm-zip`'s pre-0.6.0 "crafted ZIP triggers 4GB
   allocation" DoS, reachable via an untrusted EPUB upload — is fixed;
   `adm-zip` is pinned to `^0.6.0`.
-- Login/register are rate-limited by a small in-memory sliding-window
-  limiter (`backend/src/middleware/rateLimit.ts`) — 10 failed attempts per
-  15 minutes per (IP, email) for login, so one attacker sharing a NAT/IP
-  with real users can't lock those users out of their own accounts. This
-  is process-local state (resets on restart, doesn't span multiple
-  instances) — acceptable for a single-process self-hosted app; revisit if
-  this ever runs behind a load balancer with multiple instances.
+- No login rate limiting: this is a personal server, and a lockout only
+  ever locked out its owner.
