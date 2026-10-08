@@ -10,6 +10,8 @@ interface AuthContextValue {
   register: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   setUser: (user: User) => void;
+  /** The server said this session is no longer valid (a 401 from any request): drop it and go back to sign-in. */
+  expireSession: () => void;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -83,7 +85,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     writeCachedUser(u);
   }, []);
 
-  return <AuthContext.Provider value={{ user, loading, login, register, logout, setUser: setUserAndCache }}>{children}</AuthContext.Provider>;
+  const expireSession = useCallback(() => {
+    setUser(null);
+    writeCachedUser(null);
+  }, []);
+
+  return (
+    <AuthContext.Provider value={{ user, loading, login, register, logout, setUser: setUserAndCache, expireSession }}>{children}</AuthContext.Provider>
+  );
 }
 
 export function useAuth(): AuthContextValue {

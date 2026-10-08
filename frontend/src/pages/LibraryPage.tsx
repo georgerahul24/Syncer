@@ -51,7 +51,7 @@ function writeShelf(userId: string | undefined, kind: 'books' | 'folders' | 'tag
 
 export default function LibraryPage() {
   const { navigate } = useRouter();
-  const { user, logout, setUser } = useAuth();
+  const { user, logout, setUser, expireSession } = useAuth();
   const userId = user?.id;
   const [books, setBooks] = useState<Book[] | null>(() => readShelf<Book[]>(userId, 'books'));
   const [folders, setFolders] = useState<Folder[]>(() => readShelf<Folder[]>(userId, 'folders') ?? []);
@@ -84,26 +84,46 @@ export default function LibraryPage() {
 
   /** Resolves true when the server answered. */
   const load = useCallback(async (): Promise<boolean> => {
-    try {
-      const list = await booksApi.list();
-      setBooks(list);
-      return true;
-    } catch (err) {
-      // A refresh that couldn't reach the server must leave the list it
-      // already has alone. Replacing it with the offline-only subset would
-      // make books vanish from the shelf as the *result of asking for an
-      // update*, which reads as data loss; the caller reports the failure
-      // instead.
-      if (booksRef.current !== null) return false;
-      // First load ever on this device and the server is unreachable: show
-      // whatever was downloaded rather than a blank error. A real HTTP error
-      // (we ARE connected) still surfaces as an error.
-      const offline = err instanceof ApiError ? [] : listOfflineBooks();
-      if (offline.length > 0) setBooks(offline);
-      else setError('Could not load your library.');
-      return false;
+    // A first load with nothing cached gets a few quiet retries before it
+    // gives up: right after a server restart, or on a flaky link, the first
+    // request failing is common and almost always transient. A refresh of
+    // a shelf already on screen doesn't retry — the old list stays put.
+    const attempts = booksRef.current === null ? 4 : 1;
+    let lastErr: unknown;
+    let hasShelf = booksRef.current !== null;
+    for (let i = 0; i < attempts; i++) {
+      if (i > 0) await new Promise((r) => setTimeout(r, 1000 * 2 ** (i - 1)));
+      try {
+        setBooks(await booksApi.list());
+        setError(null);
+        return true;
+      } catch (err) {
+        lastErr = err;
+        if (err instanceof ApiError && err.status === 401) {
+          // The session is gone server-side. Sign-in is the only way forward.
+          expireSession();
+          return false;
+        }
+        // Meanwhile, show whatever is downloaded on this device.
+        if (!hasShelf) {
+          const offline = listOfflineBooks();
+          if (offline.length > 0) {
+            setBooks(offline);
+            hasShelf = true;
+          }
+        }
+      }
     }
-  }, []);
+    if (!hasShelf) {
+      setError(
+        lastErr instanceof ApiError
+          ? 'The server had a problem loading your library. Try again in a moment.'
+          : "Can't reach your Syncer server from this network. Your books and progress are safe; it will load once the server is reachable."
+      );
+    }
+    console.error('library load failed', lastErr);
+    return false;
+  }, [expireSession]);
   const loadFolders = useCallback(() => foldersApi.list().then(setFolders).catch(() => {}), []);
   const loadTags = useCallback(() => tagsApi.list().then(setTags).catch(() => {}), []);
 
