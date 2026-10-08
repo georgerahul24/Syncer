@@ -42,12 +42,17 @@ function looksLikePlainText(filePath: string): boolean {
   }
 }
 
+// PDF readers accept the %PDF- header anywhere in the first 1024 bytes, and
+// plenty of real files (scanner output, some exporters, a stray BOM) carry a
+// few bytes of junk before it.
+const PDF_HEADER_WINDOW_BYTES = 1024;
+
 function sniffFormat(filePath: string): 'pdf' | 'epub' | 'txt' | null {
   const fd = fs.openSync(filePath, 'r');
   try {
-    const head = Buffer.alloc(8);
-    fs.readSync(fd, head, 0, 8, 0);
-    if (head.subarray(0, PDF_MAGIC.length).equals(PDF_MAGIC)) return 'pdf';
+    const head = Buffer.alloc(PDF_HEADER_WINDOW_BYTES);
+    const read = fs.readSync(fd, head, 0, PDF_HEADER_WINDOW_BYTES, 0);
+    if (head.subarray(0, read).includes(PDF_MAGIC)) return 'pdf';
     if (head.subarray(0, ZIP_MAGIC.length).equals(ZIP_MAGIC)) return 'epub';
   } finally {
     fs.closeSync(fd);
