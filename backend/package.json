@@ -10,7 +10,7 @@
     "test": "tsx --test src/**/*.test.ts"
   },
   "dependencies": {
-    "adm-zip": "^0.6.0",
+    "adm-zip": "^0.6.1",
     "better-sqlite3": "^11.10.0",
     "compression": "^1.8.2",
     "express": "^4.21.2",
