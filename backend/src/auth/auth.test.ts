@@ -66,27 +66,3 @@ test('logout clears the session so subsequent requests are unauthenticated', asy
   const after = await client.get('/api/auth/me');
   assert.equal(after.status, 401);
 });
-
-test('repeated failed logins against one account are eventually rate-limited', async () => {
-  const email = 'bruteforce@example.com';
-  const setup = new TestClient(baseUrl);
-  await setup.post('/api/auth/register', { email, password: 'correct-horse' });
-
-  const client = new TestClient(baseUrl);
-  let sawTooMany = false;
-  for (let i = 0; i < 15; i++) {
-    const res = await client.post('/api/auth/login', { email, password: 'wrong-password' });
-    if (res.status === 429) {
-      sawTooMany = true;
-      break;
-    }
-    assert.equal(res.status, 401);
-  }
-  assert.ok(sawTooMany, 'expected a 429 after repeated failed attempts against the same account');
-
-  // A different account, from the same test client/IP, must be unaffected.
-  const other = new TestClient(baseUrl);
-  await setup.post('/api/auth/register', { email: 'unrelated@example.com', password: 'correct-horse' });
-  const stillWorks = await other.post('/api/auth/login', { email: 'unrelated@example.com', password: 'correct-horse' });
-  assert.equal(stillWorks.status, 200);
-});

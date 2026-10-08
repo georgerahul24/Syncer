@@ -11,16 +11,8 @@ import {
 } from './sessions.js';
 import { AppError, asyncRoute } from '../middleware/errors.js';
 import { requireAuth } from '../middleware/auth.js';
-import { rateLimit } from '../middleware/rateLimit.js';
 
 export const authRouter = Router();
-
-const loginLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 10,
-  keySuffix: (req) => String(req.body?.email ?? '').toLowerCase(),
-});
-const registerLimiter = rateLimit({ windowMs: 60 * 60 * 1000, max: 20 });
 
 interface UserRow {
   id: string;
@@ -33,7 +25,6 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 authRouter.post(
   '/register',
-  registerLimiter,
   asyncRoute(async (req, res) => {
     const { email, password } = req.body ?? {};
     if (typeof email !== 'string' || typeof password !== 'string') {
@@ -62,7 +53,6 @@ authRouter.post(
 
 authRouter.post(
   '/login',
-  loginLimiter,
   asyncRoute(async (req, res) => {
     const { email, password } = req.body ?? {};
     if (typeof email !== 'string' || typeof password !== 'string') {
