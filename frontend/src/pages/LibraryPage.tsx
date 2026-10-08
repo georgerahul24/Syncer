@@ -14,7 +14,6 @@ import { describeDownloadFailure, downloadBookForOffline, listOfflineBooks, remo
 import { forgetPdfThumbnail } from '../reader/pdf/PdfCoverThumbnail';
 import type { OfflineState } from '../components/BookCard';
 import { formatRelativeTime } from '../utils/time';
-import { readShelf, writeShelf } from '../utils/shelfCache';
 import { forgetResolvedBase, isNativeApp } from '../services/serverConfig';
 import { flush as flushOfflineQueue } from '../services/offlineQueue';
 import { IconRefresh } from '../reader/icons';
@@ -25,6 +24,30 @@ import styles from './LibraryPage.module.css';
 // a relayed connection; short enough that coming back to the shelf after
 // reading elsewhere shows the new position.
 const AUTO_REFRESH_MIN_GAP_MS = 30_000;
+
+// The shelf as last fetched, so launching the app paints the library at once
+// from this device's copy instead of waiting on the network, then refreshes
+// underneath. Per-user so switching accounts never flashes someone else's.
+function shelfKey(userId: string | undefined, kind: 'books' | 'folders' | 'tags') {
+  return `syncer:shelf:${userId ?? 'anon'}:${kind}`;
+}
+
+function readShelf<T>(userId: string | undefined, kind: 'books' | 'folders' | 'tags'): T | null {
+  try {
+    const raw = localStorage.getItem(shelfKey(userId, kind));
+    return raw ? (JSON.parse(raw) as T) : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeShelf(userId: string | undefined, kind: 'books' | 'folders' | 'tags', value: unknown) {
+  try {
+    localStorage.setItem(shelfKey(userId, kind), JSON.stringify(value));
+  } catch {
+    // best-effort only
+  }
+}
 
 export default function LibraryPage() {
   const { navigate } = useRouter();
