@@ -170,7 +170,7 @@ export function describeDownloadFailure(err: unknown): string {
   }
   if (err instanceof TypeError) {
     // fetch() rejects with a TypeError for every network-layer failure.
-    return 'Could not reach the server. Check your connection and try again.';
+    return "Can't reach your Syncer server from this network, and this book isn't downloaded on this device yet. It will open once the server is reachable.";
   }
   return 'Could not download this book. Please try again.';
 }

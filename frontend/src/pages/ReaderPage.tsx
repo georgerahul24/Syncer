@@ -11,6 +11,7 @@ import { books as booksApi, ApiError } from '../services/api';
 import type { Book, TocItem } from '../types';
 import { cacheBookMeta, describeDownloadFailure, downloadBookForOffline, getCachedBookMeta, isBookOffline, removeBookOffline } from '../utils/offlineBooks';
 import { useBookSource } from '../reader/useBookSource';
+import { readShelf } from '../utils/shelfCache';
 import { forgetPdfThumbnail } from '../reader/pdf/PdfCoverThumbnail';
 import ReaderTopBar from '../reader/ReaderTopBar';
 import ReaderChromeHandle from '../reader/ReaderChromeHandle';
@@ -28,7 +29,9 @@ export default function ReaderPage({ bookId }: { bookId: string }) {
   // Opened before on this device: start from what we saw last time, so the
   // download/open can begin at once instead of after a server round trip.
   // The fresh copy below replaces it when it arrives.
-  const [book, setBook] = useState<Book | null>(() => getCachedBookMeta(bookId));
+  const [book, setBook] = useState<Book | null>(
+    () => getCachedBookMeta(bookId) ?? readShelf<Book[]>(user?.id, 'books')?.find((b) => b.id === bookId) ?? null
+  );
   const [loadError, setLoadError] = useState<string | null>(null);
   const [readerError, setReaderError] = useState<string | null>(null);
 
@@ -67,8 +70,9 @@ export default function ReaderPage({ bookId }: { bookId: string }) {
       .catch((err) => {
         // Unreachable but opened before: keep reading the cached copy. A real
         // 4xx/5xx from the server (deleted book, etc.) still surfaces.
-        if (err instanceof ApiError || !getCachedBookMeta(bookId)) {
-          setLoadError(err instanceof ApiError ? err.message : 'This book could not be opened.');
+        if (err instanceof ApiError) setLoadError(err.message);
+        else if (!getCachedBookMeta(bookId) && !readShelf<Book[]>(user?.id, 'books')?.some((b) => b.id === bookId)) {
+          setLoadError("Can't reach your Syncer server from this network, and this book isn't on this device yet.");
         }
       });
   }, [bookId]);
