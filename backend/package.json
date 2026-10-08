@@ -15,7 +15,7 @@
     "compression": "^1.8.2",
     "express": "^4.21.2",
     "fast-xml-parser": "^5.11.1",
-    "multer": "^2.0.2",
+    "multer": "^2.4.0",
     "pdfjs-dist": "^4.7.76",
     "ws": "^8.18.0"
   },
