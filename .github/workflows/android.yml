@@ -1,0 +1,91 @@
+name: Android APK
+
+# Run by hand (Actions tab -> Android APK -> Run workflow, or
+# `gh workflow run android.yml`). Builds a release APK for arm64 phones and
+# signs it with the key in the ANDROID_KEYSTORE_B64 secret, so it installs
+# over the existing app.
+#
+# Secrets:
+#   ANDROID_KEYSTORE_B64  base64 of the signing keystore (alias androiddebugkey,
+#                         passwords "android" — a standard debug keystore)
+#   VITE_LOCAL_BASE       server address on the home LAN (http://ip:port)
+#   VITE_REMOTE_BASE      server address from anywhere (e.g. Tailscale https URL)
+on:
+  workflow_dispatch:
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Server addresses
+        env:
+          VITE_LOCAL_BASE: ${{ secrets.VITE_LOCAL_BASE }}
+          VITE_REMOTE_BASE: ${{ secrets.VITE_REMOTE_BASE }}
+        run: |
+          printf 'VITE_LOCAL_BASE=%s\nVITE_REMOTE_BASE=%s\n' "$VITE_LOCAL_BASE" "$VITE_REMOTE_BASE" > frontend/.env.local
+
+      - name: Generate the Android project
+        run: |
+          echo "NDK_HOME=$ANDROID_NDK_LATEST_HOME" >> "$GITHUB_ENV"
+          NDK_HOME=$ANDROID_NDK_LATEST_HOME npx tauri android init --ci
+
+      - name: Apply the Android overrides
+        env:
+          VITE_LOCAL_BASE: ${{ secrets.VITE_LOCAL_BASE }}
+        run: |
+          main=src-tauri/gen/android/app/src/main
+          mkdir -p "$main/res/xml"
+          cp src-tauri/android-overrides/AndroidManifest.xml "$main/AndroidManifest.xml"
+          lan_host=$(echo "$VITE_LOCAL_BASE" | sed -E 's#^[a-z]+://##; s#[:/].*$##')
+          sed "s/YOUR_LAN_IP/$lan_host/" src-tauri/android-overrides/network_security_config.example.xml \
+            > "$main/res/xml/network_security_config.xml"
+          ls "$main/res/xml"
+
+      - name: Build
+        run: npx tauri android build --apk --target aarch64
+
+      - name: Sign
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
+        run: |
+          echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/release.keystore"
+          unsigned=$(find src-tauri/gen/android/app/build/outputs/apk -name '*release*.apk' | head -1)
+          echo "unsigned: $unsigned"
+          bt=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
+          version=$(node -p "require('./src-tauri/tauri.conf.json').version")
+          "$bt/zipalign" -f -p 4 "$unsigned" "$RUNNER_TEMP/aligned.apk"
+          "$bt/apksigner" sign --ks "$RUNNER_TEMP/release.keystore" --ks-pass pass:android \
+            --ks-key-alias androiddebugkey --key-pass pass:android \
+            --out "Syncer-$version.apk" "$RUNNER_TEMP/aligned.apk"
+          "$bt/apksigner" verify "Syncer-$version.apk"
+          rm "$RUNNER_TEMP/release.keystore"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Syncer-apk
+          path: Syncer-*.apk
+          if-no-files-found: error
