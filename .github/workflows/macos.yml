@@ -1,0 +1,55 @@
+name: macOS app
+
+# Run by hand (Actions tab -> macOS app -> Run workflow, or
+# `gh workflow run macos.yml`). Builds Syncer.app for Apple Silicon and
+# uploads it zipped plus as a .dmg. Unsigned (no Apple developer account), so
+# the first launch needs right-click -> Open.
+#
+# Secrets: VITE_LOCAL_BASE and VITE_REMOTE_BASE, same as android.yml.
+on:
+  workflow_dispatch:
+
+jobs:
+  app:
+    runs-on: macos-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Server addresses
+        env:
+          VITE_LOCAL_BASE: ${{ secrets.VITE_LOCAL_BASE }}
+          VITE_REMOTE_BASE: ${{ secrets.VITE_REMOTE_BASE }}
+        run: |
+          printf 'VITE_LOCAL_BASE=%s\nVITE_REMOTE_BASE=%s\n' "$VITE_LOCAL_BASE" "$VITE_REMOTE_BASE" > frontend/.env.local
+
+      - name: Build
+        run: npx tauri build --bundles app,dmg
+
+      - name: Collect
+        run: |
+          version=$(node -p "require('./src-tauri/tauri.conf.json').version")
+          bundle=src-tauri/target/release/bundle
+          ditto -c -k --keepParent "$bundle/macos/Syncer.app" "Syncer-$version-mac.zip"
+          cp "$bundle"/dmg/*.dmg "Syncer-$version-mac.dmg"
+          ls -la Syncer-*
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Syncer-mac
+          path: Syncer-*-mac.*
+          if-no-files-found: error
