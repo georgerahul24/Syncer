@@ -1,7 +1,7 @@
 import { randomBytes, createHash } from 'node:crypto';
 import type { Request, Response } from 'express';
 import { db } from '../database/db.js';
-import { SESSION_COOKIE_NAME, SESSION_TTL_MS, IS_PROD } from '../config.js';
+import { SESSION_COOKIE_NAME, SESSION_TTL_MS } from '../config.js';
 
 function hashToken(token: string): string {
   return createHash('sha256').update(token).digest('hex');
@@ -65,6 +65,16 @@ export function getSessionTokenFromRequest(req: Request): string | undefined {
   return undefined;
 }
 
+// `Secure` follows how THIS request arrived, not NODE_ENV. The same server is
+// reached both over HTTPS (Tailscale Funnel via nginx, which sets
+// X-Forwarded-Proto — see `trust proxy` in app.ts) and over plain http on the
+// LAN. A Secure cookie on the http path is silently dropped by the browser:
+// sign-in "succeeds", the next request is unauthenticated, and the app bounces
+// straight back to the login page.
+function secureAttr(res: Response): string[] {
+  return res.req.secure ? ['Secure'] : [];
+}
+
 export function setSessionCookie(res: Response, token: string): void {
   const maxAgeSeconds = Math.floor(SESSION_TTL_MS / 1000);
   const attrs = [
@@ -73,13 +83,12 @@ export function setSessionCookie(res: Response, token: string): void {
     'HttpOnly',
     `Max-Age=${maxAgeSeconds}`,
     'SameSite=Lax',
+    ...secureAttr(res),
   ];
-  if (IS_PROD) attrs.push('Secure');
   res.setHeader('Set-Cookie', attrs.join('; '));
 }
 
 export function clearSessionCookie(res: Response): void {
-  const attrs = [`${SESSION_COOKIE_NAME}=`, 'Path=/', 'HttpOnly', 'Max-Age=0', 'SameSite=Lax'];
-  if (IS_PROD) attrs.push('Secure');
+  const attrs = [`${SESSION_COOKIE_NAME}=`, 'Path=/', 'HttpOnly', 'Max-Age=0', 'SameSite=Lax', ...secureAttr(res)];
   res.setHeader('Set-Cookie', attrs.join('; '));
 }

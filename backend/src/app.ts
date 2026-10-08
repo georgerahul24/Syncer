@@ -19,6 +19,10 @@ import { FRONTEND_DIST } from './config.js';
 export function createApp() {
   const app = express();
   app.disable('x-powered-by');
+  // Only a proxy on this machine (nginx in front of Tailscale Funnel) is
+  // trusted to say the original request was HTTPS — see secureAttr() in
+  // auth/sessions.ts.
+  app.set('trust proxy', 'loopback');
 
   // The web app is served same-origin (no CORS needed at all). The native
   // (Tauri) app has no shared origin with this server, so its requests are
