@@ -60,6 +60,28 @@ function sniffFormat(filePath: string): 'pdf' | 'epub' | 'txt' | null {
   return looksLikePlainText(filePath) ? 'txt' : null;
 }
 
+/**
+ * Drops anything a broken download prepended before the PDF header (a web
+ * server's PHP warnings, a BOM). The PDF's internal byte offsets count from
+ * its own header, so cutting the prefix makes it a valid PDF again rather
+ * than one readers have to repair.
+ */
+function stripPdfPrefix(filePath: string): void {
+  const fd = fs.openSync(filePath, 'r');
+  let offset: number;
+  try {
+    const head = Buffer.alloc(PDF_HEADER_WINDOW_BYTES);
+    const read = fs.readSync(fd, head, 0, PDF_HEADER_WINDOW_BYTES, 0);
+    offset = head.subarray(0, read).indexOf(PDF_MAGIC);
+  } finally {
+    fs.closeSync(fd);
+  }
+  if (offset <= 0) return;
+  const cleaned = `${filePath}.clean`;
+  fs.writeFileSync(cleaned, fs.readFileSync(filePath).subarray(offset));
+  fs.renameSync(cleaned, filePath);
+}
+
 function isGenuineEpub(filePath: string): boolean {
   try {
     const zip = new AdmZip(filePath);
@@ -90,6 +112,7 @@ export async function createBookFromUpload(userId: string, tempFilePath: string,
     cleanup();
     throw new AppError(400, 'Only PDF, EPUB, and plain text (.txt) files are supported');
   }
+  if (format === 'pdf') stripPdfPrefix(tempFilePath);
   if (format === 'epub' && !isGenuineEpub(tempFilePath)) {
     cleanup();
     throw new AppError(400, 'This EPUB file appears to be corrupted or invalid');
