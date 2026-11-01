@@ -3,6 +3,8 @@ import { useRouter } from '../router';
 import { useAuth } from '../hooks/useAuth';
 import { ApiError } from '../services/api';
 import ConnectionBanner from '../components/ConnectionBanner';
+import ServerSettingsDialog from '../components/ServerSettingsDialog';
+import { isNativeApp } from '../services/serverConfig';
 import styles from './AuthPage.module.css';
 
 export default function AuthPage({ mode }: { mode: 'login' | 'register' }) {
@@ -12,6 +14,7 @@ export default function AuthPage({ mode }: { mode: 'login' | 'register' }) {
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [serversOpen, setServersOpen] = useState(false);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -29,7 +32,9 @@ export default function AuthPage({ mode }: { mode: 'login' | 'register' }) {
       setError(
         err instanceof ApiError
           ? err.message
-          : 'Could not reach the server. Check your connection (or Tailscale) and try again.'
+          : isNativeApp()
+            ? 'Could not reach any of your servers. Check your connection, or the addresses under Servers below.'
+            : 'Could not reach the server. Check your connection and try again.'
       );
     } finally {
       setSubmitting(false);
@@ -101,7 +106,15 @@ export default function AuthPage({ mode }: { mode: 'login' | 'register' }) {
             </>
           )}
         </p>
+        {isNativeApp() && (
+          <p className={styles.switch}>
+            <button type="button" onClick={() => setServersOpen(true)}>
+              Servers
+            </button>
+          </p>
+        )}
       </div>
+      {serversOpen && <ServerSettingsDialog onClose={() => setServersOpen(false)} />}
     </div>
   );
 }

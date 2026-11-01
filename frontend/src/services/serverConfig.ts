@@ -4,23 +4,23 @@
 // relative '/api/...' paths always just work — no resolution needed there.
 // The native (Tauri) build has no such origin: its assets are served from
 // the OS webview's own local scheme, so it needs an absolute backend URL.
-// Both candidates are probed at once and the first one to actually answer is
+// Every saved address is probed at once and the first one to actually answer is
 // used — see resolveBase().
 
-// Both addresses come from build-time env (frontend/.env.local, gitignored —
-// see frontend/.env.example) so no network details live in the repo.
-// LOCAL_BASE is the server on the home LAN; REMOTE_BASE is its Tailscale
-// address, reachable from anywhere the device is on the tailnet.
-const LOCAL_BASE = import.meta.env.VITE_LOCAL_BASE ?? '';
-const REMOTE_BASE = import.meta.env.VITE_REMOTE_BASE ?? '';
+// The server addresses this device tries. Editable in the app (Servers
+// dialog) and saved on the device; the build-time env values
+// (frontend/.env.local) are only the defaults for a fresh install.
+const DEFAULT_SERVERS = [import.meta.env.VITE_LOCAL_BASE, import.meta.env.VITE_REMOTE_BASE].filter(
+  (u): u is string => !!u
+);
+const SERVERS_KEY = 'syncer:servers';
 
-// Two budgets, because the two addresses fail differently. Whichever answers
-// first wins, so these only bound how long a *losing* probe can delay the
-// "nothing is reachable" verdict — they never delay a success. The relayed
-// address pays a relay hop plus a TLS handshake on a cold probe; the LAN
-// address answers in milliseconds or not at all.
-const REMOTE_PROBE_TIMEOUT_MS = 2500;
+// A private-network address answers in milliseconds or not at all; anything
+// else may pay a relay hop plus a TLS handshake on a cold probe. These only
+// bound how long a *losing* probe delays the "nothing reachable" verdict —
+// the first server to answer wins immediately.
 const LOCAL_PROBE_TIMEOUT_MS = 1200;
+const REMOTE_PROBE_TIMEOUT_MS = 2500;
 const LAST_GOOD_KEY = 'syncer:server-base';
 
 export function isNativeApp(): boolean {
@@ -69,7 +69,7 @@ let resolved: Promise<string> | null = null;
 // (cover <img> URLs, books.fileUrl()). Seeded with the last base that worked
 // so the library can render covers from cache before the probe settles —
 // the app no longer waits on the network before showing anything.
-let cachedBaseSync = isNativeApp() ? readLastGood() ?? REMOTE_BASE : '';
+let cachedBaseSync = isNativeApp() ? readLastGood() ?? getServerList()[0] ?? '' : '';
 
 export type ConnectionKind = 'local' | 'remote' | 'offline';
 
@@ -94,10 +94,80 @@ interface Candidate {
   timeoutMs: number;
 }
 
-const CANDIDATES: readonly Candidate[] = [
-  { base: REMOTE_BASE, kind: 'remote' as const, timeoutMs: REMOTE_PROBE_TIMEOUT_MS },
-  { base: LOCAL_BASE, kind: 'local' as const, timeoutMs: LOCAL_PROBE_TIMEOUT_MS },
-].filter((c) => c.base);
+/** Trims, adds http:// when no scheme was typed, and drops trailing slashes. Null if it isn't a usable URL. */
+export function normalizeServerUrl(input: string): string | null {
+  let value = input.trim();
+  if (!value) return null;
+  if (!/^https?:\/\//i.test(value)) value = `http://${value}`;
+  try {
+    const url = new URL(value);
+    return `${url.protocol}//${url.host}${url.pathname.replace(/\/+$/, '')}`;
+  } catch {
+    return null;
+  }
+}
+
+/** The server addresses this device tries, in the user's order. */
+export function getServerList(): string[] {
+  try {
+    const raw = localStorage.getItem(SERVERS_KEY);
+    if (raw) {
+      const list = JSON.parse(raw);
+      if (Array.isArray(list)) return list.filter((u): u is string => typeof u === 'string' && !!u);
+    }
+  } catch {
+    // fall through to the defaults
+  }
+  return [...DEFAULT_SERVERS];
+}
+
+/** Saves the list and re-resolves on the next request. An empty list restores the defaults. */
+export function setServerList(list: string[]): void {
+  const cleaned = [...new Set(list.map(normalizeServerUrl).filter((u): u is string => !!u))];
+  try {
+    if (cleaned.length) localStorage.setItem(SERVERS_KEY, JSON.stringify(cleaned));
+    else localStorage.removeItem(SERVERS_KEY);
+    localStorage.removeItem(LAST_GOOD_KEY);
+  } catch {
+    // best-effort only
+  }
+  forgetResolvedBase();
+}
+
+export function getDefaultServers(): string[] {
+  return [...DEFAULT_SERVERS];
+}
+
+function isPrivateHost(base: string): boolean {
+  try {
+    const host = new URL(base).hostname;
+    return (
+      /^(10\.|192\.168\.|127\.|169\.254\.)/.test(host) ||
+      /^172\.(1[6-9]|2\d|3[01])\./.test(host) ||
+      host === 'localhost' ||
+      host.endsWith('.local')
+    );
+  } catch {
+    return false;
+  }
+}
+
+function toCandidate(base: string): Candidate {
+  const local = isPrivateHost(base);
+  return { base, kind: local ? 'local' : 'remote', timeoutMs: local ? LOCAL_PROBE_TIMEOUT_MS : REMOTE_PROBE_TIMEOUT_MS };
+}
+
+/** Checks one address on its own, for the Servers dialog. Resolves with the round-trip in ms, or null if it didn't answer. */
+export async function testServer(base: string): Promise<number | null> {
+  const start = performance.now();
+  const ok = await probe(base, REMOTE_PROBE_TIMEOUT_MS);
+  return ok ? Math.round(performance.now() - start) : null;
+}
+
+/** The address currently in use, or null before one has answered. */
+export function getActiveServer(): string | null {
+  return currentConnection && currentConnection !== 'offline' ? cachedBaseSync : null;
+}
 
 /**
  * Probes every candidate at once and resolves with the first one that ANSWERS,
@@ -111,10 +181,11 @@ const CANDIDATES: readonly Candidate[] = [
  * first `true` — and only the exhaustion of every probe counts as a real no.
  */
 function firstToAnswer(): Promise<Candidate | null> {
+  const candidates = getServerList().map(toCandidate);
   return new Promise((resolve) => {
-    let outstanding = CANDIDATES.length;
+    let outstanding = candidates.length;
     if (outstanding === 0) resolve(null);
-    for (const candidate of CANDIDATES) {
+    for (const candidate of candidates) {
       // `probe` resolves false rather than rejecting, so there is no rejection
       // path here that could leave `outstanding` stuck above zero.
       probe(candidate.base, candidate.timeoutMs).then((reachable) => {
@@ -138,7 +209,7 @@ async function resolveBase(): Promise<string> {
     // Neither reachable — keep the last-known-good base so URLs still build;
     // requests then fail fast with a network error, which callers treat as offline.
     setConnection('offline');
-    return readLastGood() ?? REMOTE_BASE;
+    return readLastGood() ?? getServerList()[0] ?? '';
   }
   try {
     localStorage.setItem(LAST_GOOD_KEY, winner.base);

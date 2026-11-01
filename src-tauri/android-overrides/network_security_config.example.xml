@@ -1,16 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Release builds block ALL cleartext (plain http://) traffic by default
-     (see app/build.gradle.kts's usesCleartextTraffic="false" for release).
-     LOCAL_BASE in serverConfig.ts is deliberately plain http:// (it's a
-     private LAN address, not worth a cert for), so without this exception
-     the release APK can reach REMOTE_BASE (https, over Tailscale) but every
-     request to the home LAN silently fails at the OS network layer — that's
-     what broke sign-in specifically on the home network in the release
-     build (the debug build had usesCleartextTraffic="true" globally, so it
-     never surfaced there). Scoped to just this one LAN IP so the release
-     build still refuses cleartext to anything else. -->
+<!-- Release builds block cleartext (plain http://) traffic by default. Server
+     addresses are user-editable in the app (Servers dialog), and a home LAN
+     server is usually plain http, so cleartext is allowed for any host. -->
 <network-security-config>
-    <domain-config cleartextTrafficPermitted="true">
-        <domain includeSubdomains="false">YOUR_LAN_IP</domain>
-    </domain-config>
+    <base-config cleartextTrafficPermitted="true" />
 </network-security-config>

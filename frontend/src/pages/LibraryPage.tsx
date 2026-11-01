@@ -7,6 +7,7 @@ import BookCard from '../components/BookCard';
 import LibrarySidebar, { type LibraryFilter } from '../components/LibrarySidebar';
 import OrganizeBookDialog from '../components/OrganizeBookDialog';
 import BookAnalyticsDialog from '../components/BookAnalyticsDialog';
+import ServerSettingsDialog from '../components/ServerSettingsDialog';
 import LibrarySearchBar from '../components/LibrarySearchBar';
 import InstallHint from '../components/InstallHint';
 import ConnectionBanner from '../components/ConnectionBanner';
@@ -62,6 +63,7 @@ export default function LibraryPage() {
   const [error, setError] = useState<string | null>(null);
   const [uploadPct, setUploadPct] = useState<number | null>(null);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [serversOpen, setServersOpen] = useState(false);
   const [isDraggingFile, setIsDraggingFile] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dragCounterRef = useRef(0);
@@ -523,6 +525,18 @@ export default function LibraryPage() {
                 <button type="button" className={styles.logoutButton} onClick={() => navigate('/dashboard')}>
                   Reading dashboard
                 </button>
+                {isNativeApp() && (
+                  <button
+                    type="button"
+                    className={styles.logoutButton}
+                    onClick={() => {
+                      setUserMenuOpen(false);
+                      setServersOpen(true);
+                    }}
+                  >
+                    Servers
+                  </button>
+                )}
                 <button type="button" className={styles.logoutButton} onClick={logout}>
                   Sign out
                 </button>
@@ -661,6 +675,8 @@ export default function LibraryPage() {
       )}
 
       {analyticsBook && <BookAnalyticsDialog book={analyticsBook} onClose={() => setAnalyticsBook(null)} />}
+
+      {serversOpen && <ServerSettingsDialog onClose={() => setServersOpen(false)} onSaved={() => void refresh()} />}
 
       {toast && (
         <div className={styles.toast} role="status">

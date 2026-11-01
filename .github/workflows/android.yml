@@ -8,8 +8,9 @@ name: Android APK
 # Secrets:
 #   ANDROID_KEYSTORE_B64  base64 of the signing keystore (alias androiddebugkey,
 #                         passwords "android" — a standard debug keystore)
-#   VITE_LOCAL_BASE       server address on the home LAN (http://ip:port)
-#   VITE_REMOTE_BASE      server address from anywhere (e.g. Tailscale https URL)
+#   VITE_LOCAL_BASE       default server address on the home LAN (http://ip:port)
+#   VITE_REMOTE_BASE      default server address from anywhere (e.g. Tailscale)
+#   Both are only defaults: the list is editable in the app (Servers).
 on:
   workflow_dispatch:
 
@@ -54,16 +55,11 @@ jobs:
           NDK_HOME=$ANDROID_NDK_LATEST_HOME npx tauri android init --ci
 
       - name: Apply the Android overrides
-        env:
-          VITE_LOCAL_BASE: ${{ secrets.VITE_LOCAL_BASE }}
         run: |
           main=src-tauri/gen/android/app/src/main
           mkdir -p "$main/res/xml"
           cp src-tauri/android-overrides/AndroidManifest.xml "$main/AndroidManifest.xml"
-          lan_host=$(echo "$VITE_LOCAL_BASE" | sed -E 's#^[a-z]+://##; s#[:/].*$##')
-          sed "s/YOUR_LAN_IP/$lan_host/" src-tauri/android-overrides/network_security_config.example.xml \
-            > "$main/res/xml/network_security_config.xml"
-          ls "$main/res/xml"
+          cp src-tauri/android-overrides/network_security_config.example.xml "$main/res/xml/network_security_config.xml"
 
       - name: Build
         run: npx tauri android build --apk --target aarch64

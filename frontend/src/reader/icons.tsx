@@ -102,3 +102,15 @@ export const IconRefresh = () => (
     <path d="M20 4v4.5h-4.5" />
   </svg>
 );
+
+export const IconClose = () => (
+  <svg {...BASE}>
+    <path d="M6 6l12 12M18 6L6 18" />
+  </svg>
+);
+
+export const IconArrowUp = () => (
+  <svg {...BASE}>
+    <path d="M12 19V5M6 11l6-6 6 6" />
+  </svg>
+);
