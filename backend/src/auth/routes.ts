@@ -12,8 +12,20 @@ import {
 import { AppError, asyncRoute } from '../middleware/errors.js';
 import { requireAuth } from '../middleware/auth.js';
 import { ALLOW_REGISTRATION } from '../config.js';
+import { rateLimit } from '../middleware/rateLimit.js';
 
 export const authRouter = Router();
+
+// 5 attempts a minute: invisible to a person typing a password, but it caps
+// guessing against this internet-facing server at a few hundred a hour.
+// Keyed by IP + email, so a guesser can't lock the owner out from elsewhere.
+const loginLimiter = rateLimit({
+  name: 'login',
+  windowMs: 60 * 1000,
+  max: 5,
+  keySuffix: (req) => String(req.body?.email ?? '').toLowerCase(),
+});
+const registerLimiter = rateLimit({ name: 'register', windowMs: 60 * 60 * 1000, max: 20 });
 
 interface UserRow {
   id: string;
@@ -26,6 +38,7 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 authRouter.post(
   '/register',
+  registerLimiter,
   asyncRoute(async (req, res) => {
     const { email, password } = req.body ?? {};
     if (typeof email !== 'string' || typeof password !== 'string') {
@@ -59,6 +72,7 @@ authRouter.post(
 
 authRouter.post(
   '/login',
+  loginLimiter,
   asyncRoute(async (req, res) => {
     const { email, password } = req.body ?? {};
     if (typeof email !== 'string' || typeof password !== 'string') {

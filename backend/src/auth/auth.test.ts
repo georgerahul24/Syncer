@@ -66,3 +66,22 @@ test('logout clears the session so subsequent requests are unauthenticated', asy
   const after = await client.get('/api/auth/me');
   assert.equal(after.status, 401);
 });
+
+test('more than 5 sign-in attempts a minute against one account are refused', async () => {
+  const email = 'bruteforce@example.com';
+  const setup = new TestClient(baseUrl);
+  await setup.post('/api/auth/register', { email, password: 'correct-horse' });
+
+  const client = new TestClient(baseUrl);
+  for (let i = 0; i < 5; i++) {
+    const res = await client.post('/api/auth/login', { email, password: 'wrong-password' });
+    assert.equal(res.status, 401);
+  }
+  const sixth = await client.post('/api/auth/login', { email, password: 'wrong-password' });
+  assert.equal(sixth.status, 429);
+
+  // A different account from the same client/IP is unaffected.
+  await setup.post('/api/auth/register', { email: 'unrelated@example.com', password: 'correct-horse' });
+  const other = await new TestClient(baseUrl).post('/api/auth/login', { email: 'unrelated@example.com', password: 'correct-horse' });
+  assert.equal(other.status, 200);
+});

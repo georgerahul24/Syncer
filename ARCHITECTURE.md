@@ -160,5 +160,6 @@ convention.
   directly exploitable — `adm-zip`'s pre-0.6.0 "crafted ZIP triggers 4GB
   allocation" DoS, reachable via an untrusted EPUB upload — is fixed;
   `adm-zip` is pinned to `^0.6.0`.
-- No login rate limiting: this is a personal server, and a lockout only
-  ever locked out its owner.
+- Sign-in is limited to 5 attempts a minute per (IP, email), in memory
+  (`backend/src/middleware/rateLimit.ts`). Sign-up closes once the first
+  account exists unless `ALLOW_REGISTRATION=true`.
