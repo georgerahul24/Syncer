@@ -12,7 +12,7 @@
     "frontend"
   ],
   "overrides": {
-    "qs": "6.16.0",
+    "qs": "6.17.1",
     "@xmldom/xmldom": "^0.9.12"
   },
   "scripts": {

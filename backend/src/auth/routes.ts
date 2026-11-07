@@ -11,6 +11,7 @@ import {
 } from './sessions.js';
 import { AppError, asyncRoute } from '../middleware/errors.js';
 import { requireAuth } from '../middleware/auth.js';
+import { ALLOW_REGISTRATION } from '../config.js';
 
 export const authRouter = Router();
 
@@ -33,6 +34,11 @@ authRouter.post(
     const normalizedEmail = email.trim().toLowerCase();
     if (!EMAIL_RE.test(normalizedEmail)) throw new AppError(400, 'Enter a valid email address');
     if (password.length < 8) throw new AppError(400, 'Password must be at least 8 characters');
+
+    const hasUsers = !!db.prepare(`SELECT 1 FROM users LIMIT 1`).get();
+    if (hasUsers && !ALLOW_REGISTRATION) {
+      throw new AppError(403, 'Sign-up is closed on this server. Ask its owner for an account.');
+    }
 
     const existing = db.prepare(`SELECT id FROM users WHERE email = ?`).get(normalizedEmail);
     if (existing) throw new AppError(409, 'An account with this email already exists');

@@ -17,6 +17,7 @@ import {
 } from '../sync/hub.js';
 import type { ClientMessage, ServerMessage } from '../sync/protocol.js';
 import { SESSION_COOKIE_NAME } from '../config.js';
+import { isTrustedOrigin } from '../middleware/origin.js';
 
 const HEARTBEAT_INTERVAL_MS = 30_000;
 
@@ -46,6 +47,15 @@ export function attachWebSocketServer(httpServer: HttpServer | HttpsServer): Web
     // The browser WebSocket API can't set an Authorization header, so the
     // native app (which has no cookie to rely on cross-origin — see
     // auth/sessions.ts) passes its token as a query param instead.
+    // A browser sends the session cookie with a WebSocket handshake from
+    // any page, so the Origin check is what stops another website from
+    // opening a socket as the user.
+    if (!isTrustedOrigin(req.headers.origin, req)) {
+      socket.write('HTTP/1.1 403 Forbidden\r\n\r\n');
+      socket.destroy();
+      return;
+    }
+
     const cookies = parseCookies(req.headers.cookie);
     const token = cookies[SESSION_COOKIE_NAME] || url.searchParams.get('token') || undefined;
     const session = resolveAuthSession(token);

@@ -11,11 +11,22 @@
       "identifier": "fs:allow-read-file",
       "allow": [
         {
-          "path": "$HOME/**"
+          "path": "$HOME/**/*.pdf"
+        },
+        {
+          "path": "$HOME/**/*.epub"
+        },
+        {
+          "path": "$HOME/**/*.txt"
+        },
+        {
+          "path": "$HOME/**/*.PDF"
+        },
+        {
+          "path": "$HOME/**/*.EPUB"
         }
       ]
     },
-    "opener:default",
     {
       "identifier": "opener:allow-open-url",
       "allow": [

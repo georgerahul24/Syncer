@@ -14,6 +14,7 @@ import { notebookRouter } from './notebook/routes.js';
 import { searchRouter } from './search/routes.js';
 import { errorHandler, notFoundHandler } from './middleware/errors.js';
 import { FRONTEND_DIST } from './config.js';
+import { isTrustedOrigin } from './middleware/origin.js';
 
 /** Builds the Express app without binding a port — shared by index.ts (prod) and tests. */
 export function createApp() {
@@ -24,15 +25,25 @@ export function createApp() {
   // auth/sessions.ts.
   app.set('trust proxy', 'loopback');
 
-  // The web app is served same-origin (no CORS needed at all). The native
-  // (Tauri) app has no shared origin with this server, so its requests are
-  // genuinely cross-origin — without these headers the browser/webview
-  // rejects the response before the frontend ever sees it. There's no
-  // meaningful origin allowlist to enforce here (single-user, self-hosted,
-  // auth is the actual gate), so we just reflect whatever Origin sent the
-  // request.
+  // Baseline hardening headers. no-referrer also keeps the native app's
+  // ?token= asset URLs out of any Referer header.
+  app.use((_req, res, next) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'DENY');
+    res.setHeader('Referrer-Policy', 'no-referrer');
+    next();
+  });
+
+  // The web app is same-origin and needs no CORS. The native apps have no
+  // shared origin with this server, so their requests are cross-origin and
+  // need these headers — but only they get them (see middleware/origin.ts).
+  // Reflecting any Origin, as this used to, let any website call the API.
   app.use((req, res, next) => {
     const origin = req.headers.origin;
+    if (origin && !isTrustedOrigin(origin, req)) {
+      res.status(403).json({ error: 'Origin not allowed' });
+      return;
+    }
     if (origin) {
       res.setHeader('Access-Control-Allow-Origin', origin);
       res.setHeader('Access-Control-Allow-Credentials', 'true');
@@ -40,10 +51,7 @@ export function createApp() {
     }
     if (req.method === 'OPTIONS') {
       res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-      res.setHeader(
-        'Access-Control-Allow-Headers',
-        req.headers['access-control-request-headers'] || 'Content-Type, Authorization'
-      );
+      res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
       res.setHeader('Access-Control-Max-Age', '600');
       res.status(204).end();
       return;

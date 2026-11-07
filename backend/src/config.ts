@@ -28,3 +28,22 @@ export const NODE_ENV = process.env.NODE_ENV || 'development';
 export const MAX_UPLOAD_BYTES = 500 * 1024 * 1024; // 500MB
 export const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 export const SESSION_COOKIE_NAME = 'syncer_session';
+
+// Sign-up is open only until the first account exists: the server is
+// reachable from the public internet (Tailscale Funnel), and an open sign-up
+// would let anyone create an account and fill the disk with uploads.
+// ALLOW_REGISTRATION=true reopens it (e.g. to add a family member).
+export const ALLOW_REGISTRATION = process.env.ALLOW_REGISTRATION === 'true';
+
+// Origins allowed to call the API cross-origin with credentials: the native
+// apps (Tauri serves them from these). The web app is same-origin and needs
+// no entry. EXTRA_ORIGINS adds more, comma-separated.
+export const NATIVE_ORIGINS = new Set([
+  'tauri://localhost',
+  'http://tauri.localhost',
+  'https://tauri.localhost',
+  ...(process.env.EXTRA_ORIGINS ?? '')
+    .split(',')
+    .map((o) => o.trim())
+    .filter(Boolean),
+]);
