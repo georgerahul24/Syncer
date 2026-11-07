@@ -4,7 +4,7 @@ import { useAuth } from '../hooks/useAuth';
 import { ApiError } from '../services/api';
 import ConnectionBanner from '../components/ConnectionBanner';
 import ServerSettingsDialog from '../components/ServerSettingsDialog';
-import { isNativeApp } from '../services/serverConfig';
+import { getServerList, isNativeApp } from '../services/serverConfig';
 import styles from './AuthPage.module.css';
 
 export default function AuthPage({ mode }: { mode: 'login' | 'register' }) {
@@ -14,7 +14,8 @@ export default function AuthPage({ mode }: { mode: 'login' | 'register' }) {
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [serversOpen, setServersOpen] = useState(false);
+  // A fresh install of a release build knows no server yet: start there.
+  const [serversOpen, setServersOpen] = useState(() => isNativeApp() && getServerList().length === 0);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();

@@ -1,0 +1,165 @@
+name: Release apps
+
+# Every push to main that touches the app builds both native apps and
+# publishes them as a GitHub release, which the installed apps pick up on
+# their own (frontend/src/hooks/useAppUpdate.ts). Can also be run by hand from
+# the Actions tab.
+#
+# Version: 0.3.<run number>, so every release is strictly newer than the last
+# (Android refuses an update whose versionCode didn't go up).
+#
+# Secrets:
+#   ANDROID_KEYSTORE_B64          base64 of the APK signing keystore
+#                                 (alias androiddebugkey, passwords "android")
+#   TAURI_SIGNING_PRIVATE_KEY     signs desktop updates (tauri signer generate)
+#   TAURI_SIGNING_PRIVATE_KEY_PASSWORD  its password (empty if none)
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'frontend/**'
+      - 'src-tauri/**'
+      - 'package-lock.json'
+      - '.github/workflows/release.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+env:
+  VERSION: 0.3.${{ github.run_number }}
+
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+          key: android
+
+      - run: npm ci
+
+      # No server addresses are built in: these releases are public, and the
+      # app keeps its own editable list (Servers).
+      - name: Set version
+        run: node -e "const f='src-tauri/tauri.conf.json',c=require('./'+f);c.version=process.env.VERSION;require('fs').writeFileSync(f,JSON.stringify(c,null,2))"
+
+      - name: Generate the Android project
+        run: |
+          echo "NDK_HOME=$ANDROID_NDK_LATEST_HOME" >> "$GITHUB_ENV"
+          NDK_HOME=$ANDROID_NDK_LATEST_HOME npx tauri android init --ci
+
+      - name: Apply the Android overrides
+        run: |
+          main=src-tauri/gen/android/app/src/main
+          mkdir -p "$main/res/xml"
+          cp src-tauri/android-overrides/AndroidManifest.xml "$main/AndroidManifest.xml"
+          cp src-tauri/android-overrides/network_security_config.example.xml "$main/res/xml/network_security_config.xml"
+
+      - name: Build
+        run: npx tauri android build --apk --target aarch64
+
+      - name: Sign
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
+        run: |
+          echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/release.keystore"
+          unsigned=$(find src-tauri/gen/android/app/build/outputs/apk -name '*release*.apk' | head -1)
+          bt=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
+          "$bt/zipalign" -f -p 4 "$unsigned" "$RUNNER_TEMP/aligned.apk"
+          "$bt/apksigner" sign --ks "$RUNNER_TEMP/release.keystore" --ks-pass pass:android \
+            --ks-key-alias androiddebugkey --key-pass pass:android \
+            --out "Syncer-$VERSION.apk" "$RUNNER_TEMP/aligned.apk"
+          "$bt/apksigner" verify "Syncer-$VERSION.apk"
+          rm "$RUNNER_TEMP/release.keystore"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android
+          path: Syncer-*.apk
+          if-no-files-found: error
+
+  macos:
+    runs-on: macos-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+          key: macos
+
+      - run: npm ci
+
+      # No server addresses are built in: these releases are public, and the
+      # app keeps its own editable list (Servers).
+      - name: Set version
+        run: node -e "const f='src-tauri/tauri.conf.json',c=require('./'+f);c.version=process.env.VERSION;require('fs').writeFileSync(f,JSON.stringify(c,null,2))"
+
+      - name: Build
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: npx tauri build --bundles app,dmg
+
+      - name: Collect, and write the update feed
+        run: |
+          bundle=src-tauri/target/release/bundle
+          mkdir out
+          cp "$bundle"/dmg/*.dmg "out/Syncer-$VERSION-mac.dmg"
+          cp "$bundle/macos/Syncer.app.tar.gz" "out/Syncer-$VERSION-mac.app.tar.gz"
+          sig=$(cat "$bundle/macos/Syncer.app.tar.gz.sig")
+          url="https://github.com/${GITHUB_REPOSITORY}/releases/download/v$VERSION/Syncer-$VERSION-mac.app.tar.gz"
+          node -e "
+            const [version, signature, url] = process.argv.slice(1);
+            const feed = { version, pub_date: new Date().toISOString(), platforms: { 'darwin-aarch64': { signature, url } } };
+            require('fs').writeFileSync('out/latest.json', JSON.stringify(feed, null, 2));
+          " "$VERSION" "$sig" "$url"
+          ls -la out
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos
+          path: out/*
+          if-no-files-found: error
+
+  publish:
+    needs: [android, macos]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ls -la dist
+          gh release create "v$VERSION" dist/* \
+            --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+            --title "Syncer $VERSION" \
+            --notes "Built from ${GITHUB_SHA::7}. Installed apps update themselves; to install fresh, download the .apk (Android) or .dmg (Mac) below."

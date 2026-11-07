@@ -146,6 +146,12 @@ npm run tauri:build            # desktop
 npm run tauri:android:build    # Android APK
 ```
 
+**Releases and auto-update.** Every push to `main` that touches the app runs
+`.github/workflows/release.yml`, which builds the Android APK and the macOS
+app and publishes them as a GitHub release. The Mac app installs new releases
+itself (signed with the key in the `TAURI_SIGNING_PRIVATE_KEY` secret). The
+Android app shows an "update available" banner that downloads the new APK.
+
 For Android, also copy the two files in `src-tauri/android-overrides/` into
 the generated project (see the README there).
 

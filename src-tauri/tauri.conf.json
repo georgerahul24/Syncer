@@ -40,17 +40,30 @@
     },
     "fileAssociations": [
       {
-        "ext": ["pdf"],
+        "ext": [
+          "pdf"
+        ],
         "name": "PDF Document",
         "description": "PDF Document",
         "role": "Viewer"
       },
       {
-        "ext": ["epub"],
+        "ext": [
+          "epub"
+        ],
         "name": "EPUB Book",
         "description": "EPUB eBook",
         "role": "Viewer"
       }
-    ]
+    ],
+    "createUpdaterArtifacts": true
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEY4MzM5QUMxQTE1RDdGNEIKUldSTGYxMmh3Wm96K0pTMXVqaitTeUFEV2VRYW5JRjNFd1ZJd0RSTXpZYzJHdXFBZzVXVWliMTMK",
+      "endpoints": [
+        "https://github.com/georgerahul24/Syncer/releases/latest/download/latest.json"
+      ]
+    }
   }
 }

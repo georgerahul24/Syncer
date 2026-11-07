@@ -9,7 +9,21 @@
     "core:default",
     {
       "identifier": "fs:allow-read-file",
-      "allow": [{ "path": "$HOME/**" }]
-    }
+      "allow": [
+        {
+          "path": "$HOME/**"
+        }
+      ]
+    },
+    "opener:default",
+    {
+      "identifier": "opener:allow-open-url",
+      "allow": [
+        {
+          "url": "https://github.com/georgerahul24/Syncer/*"
+        }
+      ]
+    },
+    "process:allow-restart"
   ]
 }

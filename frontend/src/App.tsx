@@ -3,6 +3,8 @@ import { useRouter } from './router';
 import { useAuth } from './hooks/useAuth';
 import { useNativeFileOpen } from './hooks/useNativeFileOpen';
 import LibraryPage from './pages/LibraryPage';
+import UpdateBanner from './components/UpdateBanner';
+import { useAppUpdate } from './hooks/useAppUpdate';
 
 // The library is the page almost every launch lands on, so it ships in the
 // main bundle. Everything else — the readers carry pdf.js and epub.js, by far
@@ -23,6 +25,7 @@ export default function App() {
   const { path, navigate } = useRouter();
   const { user, loading } = useAuth();
   useNativeFileOpen(!!user);
+  const update = useAppUpdate();
 
   const bookMatch = /^\/book\/([^/]+)$/.exec(path);
 
@@ -45,5 +48,10 @@ export default function App() {
   else if (path === '/dashboard') page = <DashboardPage />;
   else page = <LibraryPage />;
 
-  return <Suspense fallback={null}>{page}</Suspense>;
+  return (
+    <>
+      <Suspense fallback={null}>{page}</Suspense>
+      <UpdateBanner update={update} />
+    </>
+  );
 }

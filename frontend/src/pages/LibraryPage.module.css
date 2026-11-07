@@ -372,9 +372,16 @@
 }
 
 @media (max-width: 860px) {
+  /* Stretch, not the desktop's flex-start: in a column, flex-start sizes each
+     child to its content, so a shelf of N covers made the whole page N
+     covers wide and it overflowed sideways instead of the shelf scrolling. */
   .layout {
     flex-direction: column;
+    align-items: stretch;
     gap: 0;
+  }
+  .content {
+    width: 100%;
   }
   .sidebarCol {
     position: static;

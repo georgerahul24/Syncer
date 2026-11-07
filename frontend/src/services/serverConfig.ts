@@ -8,8 +8,8 @@
 // used — see resolveBase().
 
 // The server addresses this device tries. Editable in the app (Servers
-// dialog) and saved on the device; the build-time env values
-// (frontend/.env.local) are only the defaults for a fresh install.
+// dialog) and saved on the device. Local builds can seed defaults from
+// frontend/.env.local; the public release builds ship with none.
 const DEFAULT_SERVERS = [import.meta.env.VITE_LOCAL_BASE, import.meta.env.VITE_REMOTE_BASE].filter(
   (u): u is string => !!u
 );
@@ -118,7 +118,12 @@ export function getServerList(): string[] {
   } catch {
     // fall through to the defaults
   }
-  return [...DEFAULT_SERVERS];
+  if (DEFAULT_SERVERS.length) return [...DEFAULT_SERVERS];
+  // Public release builds carry no addresses (they're downloadable by anyone).
+  // An app updated from an older build still knows the server it last
+  // reached, so start from that rather than an empty list.
+  const lastGood = readLastGood();
+  return lastGood ? [lastGood] : [];
 }
 
 /** Saves the list and re-resolves on the next request. An empty list restores the defaults. */

@@ -4,7 +4,16 @@ use tauri::Emitter;
 pub fn run() {
   tauri::Builder::default()
     .plugin(tauri_plugin_fs::init())
+    // Opens the new APK's download link on Android (see useAppUpdate.ts).
+    .plugin(tauri_plugin_opener::init())
+    // Restarts the desktop app after an update has been installed.
+    .plugin(tauri_plugin_process::init())
     .setup(|app| {
+      // Desktop installs its own updates from the GitHub release feed
+      // (tauri.conf.json's plugins.updater). Android has no equivalent: a
+      // sideloaded app can't replace itself, so it only links to the APK.
+      #[cfg(desktop)]
+      app.handle().plugin(tauri_plugin_updater::Builder::new().build())?;
       if cfg!(debug_assertions) {
         app.handle().plugin(
           tauri_plugin_log::Builder::default()
