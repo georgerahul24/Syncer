@@ -25,7 +25,7 @@ export default function App() {
   const { path, navigate } = useRouter();
   const { user, loading } = useAuth();
   useNativeFileOpen(!!user);
-  const update = useAppUpdate();
+  const update = useAppUpdate({ autoCheck: true });
 
   const bookMatch = /^\/book\/([^/]+)$/.exec(path);
 

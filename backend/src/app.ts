@@ -12,6 +12,7 @@ import { shareTargetRouter } from './share/routes.js';
 import { analyticsRouter } from './analytics/routes.js';
 import { notebookRouter } from './notebook/routes.js';
 import { searchRouter } from './search/routes.js';
+import { appReleaseRouter } from './appRelease/routes.js';
 import { errorHandler, notFoundHandler } from './middleware/errors.js';
 import { FRONTEND_DIST } from './config.js';
 import { isTrustedOrigin } from './middleware/origin.js';
@@ -75,6 +76,9 @@ export function createApp() {
     res.json({ ok: true });
   });
 
+  // Public, and mounted before the routers that require sign-in for everything
+  // under /api.
+  app.use('/api', appReleaseRouter);
   app.use('/api/auth', authRouter);
   app.use('/api/books', booksRouter);
   app.use('/api/books', readerRouter);

@@ -8,6 +8,7 @@ import LibrarySidebar, { type LibraryFilter } from '../components/LibrarySidebar
 import OrganizeBookDialog from '../components/OrganizeBookDialog';
 import BookAnalyticsDialog from '../components/BookAnalyticsDialog';
 import ServerSettingsDialog from '../components/ServerSettingsDialog';
+import { checkForUpdate, getAppVersion } from '../services/appUpdate';
 import LibrarySearchBar from '../components/LibrarySearchBar';
 import InstallHint from '../components/InstallHint';
 import ConnectionBanner from '../components/ConnectionBanner';
@@ -64,6 +65,10 @@ export default function LibraryPage() {
   const [uploadPct, setUploadPct] = useState<number | null>(null);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [serversOpen, setServersOpen] = useState(false);
+  const [appVersion, setAppVersion] = useState<string | null>(null);
+  useEffect(() => {
+    getAppVersion().then(setAppVersion).catch(() => {});
+  }, []);
   const [isDraggingFile, setIsDraggingFile] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dragCounterRef = useRef(0);
@@ -535,6 +540,19 @@ export default function LibraryPage() {
                     }}
                   >
                     Servers
+                  </button>
+                )}
+                {isNativeApp() && (
+                  <button
+                    type="button"
+                    className={styles.logoutButton}
+                    onClick={() => {
+                      setUserMenuOpen(false);
+                      void checkForUpdate({ manual: true });
+                    }}
+                  >
+                    Check for updates
+                    {appVersion && <span className={styles.menuMeta}>v{appVersion}</span>}
                   </button>
                 )}
                 <button type="button" className={styles.logoutButton} onClick={logout}>

@@ -216,3 +216,15 @@ export const notebookPages = {
 export const search = {
   query: (q: string) => request<SearchResult[]>(`/search?q=${encodeURIComponent(q)}`),
 };
+
+export interface AppRelease {
+  version: string;
+  apkUrl: string | null;
+  dmgUrl: string | null;
+  publishedAt: string;
+}
+
+export const appRelease = {
+  /** The latest published native-app release, as the server last saw it on GitHub. */
+  latest: () => request<AppRelease>('/app-release'),
+};

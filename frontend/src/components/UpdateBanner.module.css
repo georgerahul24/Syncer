@@ -20,7 +20,7 @@
   gap: var(--space-2);
   max-width: calc(100vw - 2 * var(--gutter));
   padding: var(--space-2) var(--space-2) var(--space-2) var(--space-5);
-  border-radius: var(--radius-full);
+  border-radius: var(--radius-xl);
   background: var(--color-ink);
   color: var(--color-ink-contrast);
   box-shadow: var(--shadow-lg);
@@ -30,9 +30,9 @@
 
 .text {
   font-weight: 500;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  /* Error messages can be long: wrap them rather than cutting them off. */
+  overflow-wrap: anywhere;
+  line-height: 1.35;
   font-variant-numeric: tabular-nums;
   min-width: 0;
   padding: var(--space-2) var(--space-3) var(--space-2) 0;
