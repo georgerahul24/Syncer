@@ -383,11 +383,23 @@ export default function EpubReader({
     // that pull is, so it never feels like nothing is happening either.
     const PULL_MAX_PX = 120; // asymptote: the band never stretches past this
     const PULL_COMMIT_PX = 150; // raw finger travel past the edge that turns the page
-    const WHEEL_COMMIT_PX = 420; // accumulated wheel/trackpad delta past the edge
+    // Wheel and trackpad follow the same rules as touch: a fresh gesture
+    // that starts at the edge stretches the band, and letting go past the
+    // mark (the wheel going quiet) turns the chapter, like lifting a finger.
+    const WHEEL_COMMIT_PX = 280; // accumulated wheel/trackpad delta past the edge
     // A wheel stream with no gap this long since reaching the edge is the
     // momentum of the scroll that got there, not a new intent to go further.
-    const WHEEL_NEW_GESTURE_GAP_MS = 220;
-    const WHEEL_RELEASE_MS = 260; // wheel pause that ends a pull
+    const WHEEL_NEW_GESTURE_GAP_MS = 200;
+    // A macOS trackpad swipe made while the last one's momentum is still
+    // running never leaves a gap. Momentum only ever shrinks, so a delta this
+    // many times bigger than the one before it is a new swipe starting.
+    const WHEEL_NEW_SWIPE_RATIO = 2.5;
+    // A lone event after a pause is a mouse wheel notch, which on a Mac can
+    // be only a few pixels. Count each notch as at least this much, so a
+    // handful of deliberate clicks gets there.
+    const WHEEL_NOTCH_MIN_PX = 70;
+    const WHEEL_NOTCH_GAP_MS = 90;
+    const WHEEL_RELEASE_MS = 450; // wheel pause that ends a pull
     const SLIDE_OUT_PX = 36;
     const SLIDE_IN_PX = 48;
     const SLIDE_OUT_MS = 130;
@@ -400,11 +412,18 @@ export default function EpubReader({
     // all, so the band feels like it's tightening against a stop.
     const damp = (raw: number) => PULL_MAX_PX * (1 - Math.exp(-raw / PULL_MAX_PX));
 
-    function showPullHint(direction: 1 | -1, fraction: number) {
+    function showPullHint(direction: 1 | -1, fraction: number, wheel = false) {
       const hint = pullHintRef.current;
       if (!hint) return;
       const ready = fraction >= 1;
-      const label = direction === 1 ? (ready ? 'Release for next chapter' : 'Keep pulling for next chapter') : ready ? 'Release for previous chapter' : 'Keep pulling for previous chapter';
+      const which = direction === 1 ? 'next' : 'previous';
+      const label = ready
+        ? wheel
+          ? `Stop scrolling for ${which} chapter`
+          : `Release for ${which} chapter`
+        : wheel
+          ? `Keep scrolling for ${which} chapter`
+          : `Keep pulling for ${which} chapter`;
       if (hint.textContent !== label) hint.textContent = label;
       hint.dataset.edge = direction === 1 ? 'bottom' : 'top';
       hint.dataset.ready = ready ? 'true' : 'false';
@@ -549,57 +568,76 @@ export default function EpubReader({
     let wheelDir: 0 | 1 | -1 = 0;
     let wheelArmed = false;
     let lastWheelAt = 0;
+    let lastWheelMag = 0;
     let wheelReleaseTimer: ReturnType<typeof setTimeout> | undefined;
 
-    function releaseWheelPull() {
-      const el = scrollerEl();
-      if (el && wheelPull > 0 && !crossingRef.current) setPull(el, 0, SPRING_BACK_MS);
-      if (!crossingRef.current) hidePullHint();
+    function resetWheelPull() {
       wheelPull = 0;
       wheelDir = 0;
+      wheelArmed = false;
+    }
+
+    // The wheel went quiet: the equivalent of lifting a finger. Past the
+    // mark turns the chapter, short of it springs back.
+    function releaseWheelPull() {
+      const dir = wheelDir;
+      const committed = dir !== 0 && wheelPull >= WHEEL_COMMIT_PX;
+      resetWheelPull();
+      if (crossingRef.current) return;
+      if (committed) {
+        crossChapter(dir);
+        return;
+      }
+      const el = scrollerEl();
+      if (el) setPull(el, 0, SPRING_BACK_MS);
+      hidePullHint();
     }
 
     function onWheel(e: WheelEvent) {
-      if (settings.mode === 'paginated' || e.deltaY === 0 || crossingRef.current) return;
+      if (settings.mode === 'paginated' || e.ctrlKey || e.deltaY === 0 || crossingRef.current) return;
       const el = scrollerEl();
       if (!el) return;
       const now = performance.now();
       const gap = now - lastWheelAt;
       lastWheelAt = now;
+      // deltaMode 1 = lines (Firefox with a mouse wheel), 2 = pages.
+      const mag = Math.abs(e.deltaY) * (e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? el.clientHeight : 1);
+      const prevMag = lastWheelMag;
+      lastWheelMag = mag;
       const direction: 1 | -1 = e.deltaY > 0 ? 1 : -1;
 
       if (!atEdge(el, direction)) {
-        // Still scrolling through the chapter. Disarm, so the momentum that
-        // carries this scroll into the edge can't count as a pull.
+        // Still scrolling through the chapter (or turned back the other
+        // way). Disarm, so the momentum that carries this scroll into the
+        // edge can't count as a pull.
+        clearTimeout(wheelReleaseTimer);
+        if (wheelPull) {
+          resetWheelPull();
+          setPull(el, 0, SPRING_BACK_MS);
+          hidePullHint();
+        }
         wheelArmed = false;
-        if (wheelPull) releaseWheelPull();
         return;
       }
       // Only a fresh gesture that starts while already resting at the edge
-      // counts toward turning the page.
+      // counts toward turning the chapter.
       if (!wheelArmed) {
-        if (gap < WHEEL_NEW_GESTURE_GAP_MS) return;
+        const freshSwipe = mag >= 4 && mag > prevMag * WHEEL_NEW_SWIPE_RATIO;
+        if (gap < WHEEL_NEW_GESTURE_GAP_MS && !freshSwipe) return;
         wheelArmed = true;
       }
       if (wheelDir !== direction) {
         wheelPull = 0;
         wheelDir = direction;
       }
-      // deltaMode 1 = lines (Firefox with a mouse wheel), 2 = pages.
-      const px = Math.abs(e.deltaY) * (e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? el.clientHeight : 1);
-      wheelPull += px;
-      setPull(el, (direction === 1 ? -1 : 1) * damp(wheelPull * (PULL_COMMIT_PX / WHEEL_COMMIT_PX)), 0);
-      showPullHint(direction, wheelPull / WHEEL_COMMIT_PX);
+      wheelPull += gap >= WHEEL_NOTCH_GAP_MS ? Math.max(mag, WHEEL_NOTCH_MIN_PX) : mag;
+      const fraction = wheelPull / WHEEL_COMMIT_PX;
+      setPull(el, (direction === 1 ? -1 : 1) * damp(Math.min(wheelPull, WHEEL_COMMIT_PX * 1.5) * (PULL_COMMIT_PX / WHEEL_COMMIT_PX)), 0);
+      showPullHint(direction, fraction, true);
 
       clearTimeout(wheelReleaseTimer);
-      if (wheelPull >= WHEEL_COMMIT_PX) {
-        wheelPull = 0;
-        wheelDir = 0;
-        wheelArmed = false;
-        crossChapter(direction);
-        return;
-      }
-      wheelReleaseTimer = setTimeout(releaseWheelPull, WHEEL_RELEASE_MS);
+      // Once past the mark, a short pause is enough to count as letting go.
+      wheelReleaseTimer = setTimeout(releaseWheelPull, fraction >= 1 ? 220 : WHEEL_RELEASE_MS);
     }
 
     // Paginated mode: wheel or trackpad swipe turns the page.
