@@ -12,6 +12,7 @@ import { useNotebookPages } from '../notebook/useNotebookPages';
 import NotebookPageBlock from './NotebookPageBlock';
 import { INK_COLORS, INK_WIDTHS } from './inkConstants';
 import { clampPadding } from '../padding';
+import { createWheelPager } from '../wheelPaging';
 import styles from './PdfReader.module.css';
 
 const PRELOAD_MARGIN = '1200px 0px';
@@ -387,6 +388,29 @@ export default function PdfReader({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [settings.mode, currentPage, numPages]);
 
+  // Wheel or trackpad swipe turns the page in paginated mode. Without this a
+  // desktop with no touch screen (the Mac app) could only use the arrow keys
+  // and the click zones. The latest goToPage/currentPage is read through a
+  // ref so the listener isn't re-attached on every page turn, which would
+  // reset the pager mid-gesture and let one flick turn several pages.
+  const wheelTurnRef = useRef<(direction: 1 | -1) => void>(() => {});
+  wheelTurnRef.current = (direction) => {
+    if (drawMode) return;
+    onActivity();
+    goToPage(currentPage + direction, { discrete: true });
+  };
+  const paginatedViewportRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = paginatedViewportRef.current;
+    if (!el || !ready || settings.mode !== 'paginated') return;
+    const pager = createWheelPager((direction) => wheelTurnRef.current(direction));
+    el.addEventListener('wheel', pager.onWheel, { passive: true });
+    return () => {
+      pager.dispose();
+      el.removeEventListener('wheel', pager.onWheel);
+    };
+  }, [ready, settings.mode]);
+
   // Touch swipe for paginated mode.
   const touchStartXRef = useRef<number | null>(null);
   function onTouchStart(e: React.TouchEvent) {
@@ -522,6 +546,7 @@ export default function PdfReader({
 
       {ready && settings.mode === 'paginated' && (
         <div
+          ref={paginatedViewportRef}
           className={styles.paginatedViewport}
           style={padStyle}
           onMouseMove={onActivity}

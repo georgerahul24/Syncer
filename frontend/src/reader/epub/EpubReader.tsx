@@ -11,6 +11,7 @@ import HighlightPopup, { COLOR_VAR } from './HighlightPopup';
 import EpubSearchOverlay from './EpubSearchOverlay';
 import { useReadingSessionTracker } from '../analytics/useReadingSessionTracker';
 import { clampPadding, useViewportSize } from '../padding';
+import { createWheelPager } from '../wheelPaging';
 import styles from './EpubReader.module.css';
 
 interface PendingSelection {
@@ -601,6 +602,18 @@ export default function EpubReader({
       wheelReleaseTimer = setTimeout(releaseWheelPull, WHEEL_RELEASE_MS);
     }
 
+    // Paginated mode: wheel or trackpad swipe turns the page.
+    const wheelPager = createWheelPager((direction) => {
+      if (renditionRef.current !== rendition) return;
+      onActivity();
+      discreteRef.current = true;
+      if (direction === 1) rendition.next();
+      else rendition.prev();
+    });
+    // The margins and click zones around the book are outside its iframe.
+    const viewportEl = settings.mode === 'paginated' ? containerRef.current.parentElement : null;
+    viewportEl?.addEventListener('wheel', wheelPager.onWheel, { passive: true });
+
     rendition.on('rendered', (_section: unknown, view: { document?: Document }) => {
       const doc = view?.document;
       if (!doc) return;
@@ -610,7 +623,12 @@ export default function EpubReader({
       doc.addEventListener('keydown', wake);
       doc.addEventListener('touchstart', wake);
 
-      if (settings.mode === 'paginated') return;
+      if (settings.mode === 'paginated') {
+        // The page lives in an iframe, so the wheel lands in there and never
+        // reaches the outer listener below.
+        doc.addEventListener('wheel', wheelPager.onWheel, { passive: true });
+        return;
+      }
       // These have to go on the chapter's own document: the section fills
       // the scroller with an iframe, so wheel/touch land inside it and
       // never reach anything we own on the outside.
@@ -769,6 +787,8 @@ export default function EpubReader({
     return () => {
       cancelled = true;
       clearTimeout(wheelReleaseTimer);
+      wheelPager.dispose();
+      viewportEl?.removeEventListener('wheel', wheelPager.onWheel);
       rendition.destroy();
       renditionRef.current = null;
       window.removeEventListener('mousedown', dismissIfOutside);
