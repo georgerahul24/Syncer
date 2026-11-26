@@ -397,6 +397,13 @@ export default function EpubReader({
     // that pull is, so it never feels like nothing is happening either.
     const PULL_MAX_PX = 120; // asymptote: the band never stretches past this
     const PULL_COMMIT_PX = 150; // raw finger travel past the edge that turns the page
+    // A section that fits on the screen (a cover, a title page, a
+    // dedication) has nothing to scroll, so no momentum can carry the reader
+    // into its edge by accident: an ordinary swipe is clearly meant to move
+    // on. These pages get a much shorter pull, so skipping front matter
+    // takes one swipe each instead of a deliberate tug every time.
+    const SHORT_PULL_COMMIT_PX = 70;
+    const SHORT_WHEEL_COMMIT_PX = 110;
     // Wheel and trackpad follow the same rules as touch: a fresh gesture
     // that starts at the edge stretches the band, and letting go past the
     // mark (the wheel going quiet) turns the chapter, like lifting a finger.
@@ -558,7 +565,11 @@ export default function EpubReader({
             if (el) setPull(el, 0, SPRING_BACK_MS);
           })
           .finally(() => {
-            setTimeout(() => (crossingRef.current = false), 400);
+            // A short guard against one gesture's tail turning a second
+            // chapter. Kept brief: the chapter only turns once input has
+            // stopped (see releaseWheelPull / endPull), so there's no burst
+            // to absorb, and a longer lock just swallowed the next swipe.
+            setTimeout(() => (crossingRef.current = false), 120);
           });
       }, SLIDE_OUT_MS);
     }
@@ -569,6 +580,9 @@ export default function EpubReader({
         ? el.scrollHeight - el.scrollTop - el.clientHeight <= EDGE_SLACK_PX
         : el.scrollTop <= EDGE_SLACK_PX;
     }
+    const fitsOnScreen = (el: HTMLElement) => el.scrollHeight - el.clientHeight <= EDGE_SLACK_PX;
+    const wheelCommitPx = (el: HTMLElement) => (fitsOnScreen(el) ? SHORT_WHEEL_COMMIT_PX : WHEEL_COMMIT_PX);
+    const touchCommitPx = (el: HTMLElement) => (fitsOnScreen(el) ? SHORT_PULL_COMMIT_PX : PULL_COMMIT_PX);
 
     let wheelPull = 0;
     let wheelDir: 0 | 1 | -1 = 0;
@@ -587,14 +601,14 @@ export default function EpubReader({
     // mark turns the chapter, short of it springs back.
     function releaseWheelPull() {
       const dir = wheelDir;
-      const committed = dir !== 0 && wheelPull >= WHEEL_COMMIT_PX;
+      const el = scrollerEl();
+      const committed = dir !== 0 && !!el && wheelPull >= wheelCommitPx(el);
       resetWheelPull();
       if (crossingRef.current) return;
       if (committed) {
         crossChapter(dir);
         return;
       }
-      const el = scrollerEl();
       if (el) setPull(el, 0, SPRING_BACK_MS);
       hidePullHint();
     }
@@ -636,8 +650,9 @@ export default function EpubReader({
         wheelDir = direction;
       }
       wheelPull += gap >= WHEEL_NOTCH_GAP_MS ? Math.max(mag, WHEEL_NOTCH_MIN_PX) : mag;
-      const fraction = wheelPull / WHEEL_COMMIT_PX;
-      setPull(el, (direction === 1 ? -1 : 1) * damp(Math.min(wheelPull, WHEEL_COMMIT_PX * 1.5) * (PULL_COMMIT_PX / WHEEL_COMMIT_PX)), 0);
+      const commitPx = wheelCommitPx(el);
+      const fraction = wheelPull / commitPx;
+      setPull(el, (direction === 1 ? -1 : 1) * damp(Math.min(fraction, 1.5) * touchCommitPx(el)), 0);
       showPullHint(direction, fraction, true);
 
       clearTimeout(wheelReleaseTimer);
@@ -661,6 +676,109 @@ export default function EpubReader({
     const onViewportWheel = (e: WheelEvent) => (settings.mode === 'paginated' ? wheelPager.onWheel(e) : onWheel(e));
     viewportEl?.addEventListener('wheel', onViewportWheel, { passive: true });
 
+    // Touch drives the rubber band: once a drag runs past the chapter edge,
+    // follow the finger with damping so it reads as resistance, and decide
+    // on release. Attached to each chapter's document (see 'rendered') and,
+    // like the wheel above, to the viewport around it, so a swipe on the
+    // blank space under a short page (a cover, a dedication) works too.
+    // These stay passive (we must never block scrolling), which is fine:
+    // at the edge there is no native scrolling left to fight, and
+    // overscroll-behavior on the scroller (see the stylesheet) keeps the
+    // browser's own overscroll away.
+    function attachTouchPull(target: Document | HTMLElement) {
+      let touchStartY: number | null = null;
+      let touchStartedAtEdge: { forward: boolean; back: boolean } | null = null;
+      let pullDir: 0 | 1 | -1 = 0;
+      let pullOriginY = 0;
+      let rawPull = 0;
+
+      // The finger's position in the top-level viewport. Inside a chapter,
+      // clientY is relative to the iframe, and the pull itself moves that
+      // iframe along with the finger, so measuring there under-counted the
+      // stretch by the band's own offset (a 240px drag read as ~140px).
+      // Adding the frame's current on-screen top (which includes the
+      // transform) undoes that.
+      const frame = (target as Document).defaultView?.frameElement as HTMLElement | null | undefined;
+      const fingerY = (e: TouchEvent): number | null => {
+        const y = e.changedTouches[0]?.clientY;
+        if (y == null) return null;
+        return frame ? y + frame.getBoundingClientRect().top : y;
+      };
+
+      const endPull = () => {
+        const el = scrollerEl();
+        if (pullDir && el && rawPull >= touchCommitPx(el)) crossChapter(pullDir);
+        else if (el && pullDir) {
+          setPull(el, 0, SPRING_BACK_MS);
+          hidePullHint();
+        }
+        touchStartY = null;
+        pullDir = 0;
+        rawPull = 0;
+      };
+
+      const onTouchStart = (e: TouchEvent) => {
+        if (settings.mode === 'paginated') return;
+        // Only a drag that *starts* with the chapter already resting at an
+        // edge can become a pull — a fling that coasts into the edge and a
+        // finger that keeps going never does.
+        const el = scrollerEl();
+        touchStartedAtEdge = el ? { forward: atEdge(el, 1), back: atEdge(el, -1) } : null;
+        touchStartY = fingerY(e);
+        pullDir = 0;
+        rawPull = 0;
+      };
+
+      const onTouchMove = (e: TouchEvent) => {
+        if (touchStartY == null || crossingRef.current) return;
+        const el = scrollerEl();
+        if (!el) return;
+        const y = fingerY(e) ?? touchStartY;
+
+        if (!pullDir) {
+          // Dragging the finger UP pulls content up, i.e. reads forward.
+          const dy = touchStartY - y;
+          if (Math.abs(dy) < 10) return;
+          const direction: 1 | -1 = dy > 0 ? 1 : -1;
+          if (!atEdge(el, direction)) return; // ordinary scrolling
+          if (!touchStartedAtEdge || !(direction === 1 ? touchStartedAtEdge.forward : touchStartedAtEdge.back)) {
+            // Scrolled into the edge during this drag — let it rest there.
+            touchStartY = null;
+            return;
+          }
+          pullDir = direction;
+          pullOriginY = y; // measure the stretch from where it caught
+          rawPull = 0;
+          return;
+        }
+
+        rawPull = pullDir === 1 ? pullOriginY - y : y - pullOriginY;
+        if (rawPull <= 0) {
+          // Dragged back the other way — let the band go slack.
+          rawPull = 0;
+          pullOriginY = y;
+          setPull(el, 0, 0);
+          hidePullHint();
+          return;
+        }
+        const commitPx = touchCommitPx(el);
+        setPull(el, (pullDir === 1 ? -1 : 1) * damp(Math.min(rawPull, commitPx * 1.5)), 0);
+        showPullHint(pullDir, rawPull / commitPx);
+      };
+
+      target.addEventListener('touchstart', onTouchStart as EventListener, { passive: true });
+      target.addEventListener('touchmove', onTouchMove as EventListener, { passive: true });
+      target.addEventListener('touchend', endPull, { passive: true });
+      target.addEventListener('touchcancel', endPull, { passive: true });
+      return () => {
+        target.removeEventListener('touchstart', onTouchStart as EventListener);
+        target.removeEventListener('touchmove', onTouchMove as EventListener);
+        target.removeEventListener('touchend', endPull);
+        target.removeEventListener('touchcancel', endPull);
+      };
+    }
+    const detachViewportTouch = viewportEl ? attachTouchPull(viewportEl) : undefined;
+
     rendition.on('rendered', (_section: unknown, view: { document?: Document }) => {
       const doc = view?.document;
       if (!doc) return;
@@ -680,85 +798,7 @@ export default function EpubReader({
       // the scroller with an iframe, so wheel/touch land inside it and
       // never reach anything we own on the outside.
       doc.addEventListener('wheel', onWheel, { passive: true });
-      // Touch drives the rubber band: once a drag runs past the chapter
-      // edge, follow the finger with damping so it reads as resistance, and
-      // decide on release. These stay passive — we must never block
-      // scrolling — which is fine, because at the edge there is no native
-      // scrolling left to fight, and overscroll-behavior on the scroller
-      // (see the stylesheet) keeps the browser's own overscroll away.
-      let touchStartY: number | null = null;
-      let touchStartedAtEdge: { forward: boolean; back: boolean } | null = null;
-      let pullDir: 0 | 1 | -1 = 0;
-      let pullOriginY = 0;
-      let rawPull = 0;
-
-      const endPull = () => {
-        const el = scrollerEl();
-        if (pullDir && rawPull >= PULL_COMMIT_PX) crossChapter(pullDir);
-        else if (el && pullDir) {
-          setPull(el, 0, SPRING_BACK_MS);
-          hidePullHint();
-        }
-        touchStartY = null;
-        pullDir = 0;
-        rawPull = 0;
-      };
-
-      doc.addEventListener(
-        'touchstart',
-        (e: TouchEvent) => {
-          // Only a drag that *starts* with the chapter already resting at an
-          // edge can become a pull — a fling that coasts into the edge and a
-          // finger that keeps going never does.
-          const el = scrollerEl();
-          touchStartedAtEdge = el ? { forward: atEdge(el, 1), back: atEdge(el, -1) } : null;
-          touchStartY = e.changedTouches[0]?.clientY ?? null;
-          pullDir = 0;
-          rawPull = 0;
-        },
-        { passive: true }
-      );
-      doc.addEventListener(
-        'touchmove',
-        (e: TouchEvent) => {
-          if (touchStartY == null || crossingRef.current) return;
-          const el = scrollerEl();
-          if (!el) return;
-          const y = e.changedTouches[0]?.clientY ?? touchStartY;
-
-          if (!pullDir) {
-            // Dragging the finger UP pulls content up, i.e. reads forward.
-            const dy = touchStartY - y;
-            if (Math.abs(dy) < 10) return;
-            const direction: 1 | -1 = dy > 0 ? 1 : -1;
-            if (!atEdge(el, direction)) return; // ordinary scrolling
-            if (!touchStartedAtEdge || !(direction === 1 ? touchStartedAtEdge.forward : touchStartedAtEdge.back)) {
-              // Scrolled into the edge during this drag — let it rest there.
-              touchStartY = null;
-              return;
-            }
-            pullDir = direction;
-            pullOriginY = y; // measure the stretch from where it caught
-            rawPull = 0;
-            return;
-          }
-
-          rawPull = pullDir === 1 ? pullOriginY - y : y - pullOriginY;
-          if (rawPull <= 0) {
-            // Dragged back the other way — let the band go slack.
-            rawPull = 0;
-            pullOriginY = y;
-            setPull(el, 0, 0);
-            hidePullHint();
-            return;
-          }
-          setPull(el, pullDir === 1 ? -damp(rawPull) : damp(rawPull), 0);
-          showPullHint(pullDir, rawPull / PULL_COMMIT_PX);
-        },
-        { passive: true }
-      );
-      doc.addEventListener('touchend', endPull, { passive: true });
-      doc.addEventListener('touchcancel', endPull, { passive: true });
+      attachTouchPull(doc);
     });
 
     // Keyboard page turns. epub.js forwards DOM events from inside each
@@ -823,6 +863,7 @@ export default function EpubReader({
       clearTimeout(wheelReleaseTimer);
       wheelPager.dispose();
       viewportEl?.removeEventListener('wheel', onViewportWheel);
+      detachViewportTouch?.();
       rendition.destroy();
       renditionRef.current = null;
       if (pendingEpubSelectionTimer.current) clearTimeout(pendingEpubSelectionTimer.current);
