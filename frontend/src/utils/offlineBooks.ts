@@ -1,5 +1,6 @@
 import type { Book } from '../types';
 import { books as booksApi } from '../services/api';
+import { readJSON, writeJSON } from './storage';
 
 // Every book is read from a fully-downloaded local copy: opening one
 // downloads the whole file into Cache Storage first (ensureBookDownloaded),
@@ -24,22 +25,8 @@ const metaKey = (bookId: string) => `syncer:offline-book-meta:${bookId}`;
 // always agree regardless of which base or token was active at the time.
 const offlineKey = (bookId: string, kind: 'file' | 'cover' | 'thumb') => `https://offline.syncer.local/books/${bookId}/${kind}`;
 
-function readIndex(): string[] {
-  try {
-    const raw = localStorage.getItem(INDEX_KEY);
-    return raw ? JSON.parse(raw) : [];
-  } catch {
-    return [];
-  }
-}
-
-function writeIndex(ids: string[]): void {
-  try {
-    localStorage.setItem(INDEX_KEY, JSON.stringify(ids));
-  } catch {
-    // best-effort only
-  }
-}
+const readIndex = () => readJSON<string[]>(INDEX_KEY) ?? [];
+const writeIndex = (ids: string[]) => writeJSON(INDEX_KEY, ids);
 
 export function isBookOffline(bookId: string): boolean {
   return readIndex().includes(bookId);
@@ -47,33 +34,17 @@ export function isBookOffline(bookId: string): boolean {
 
 export function listOfflineBooks(): Book[] {
   return readIndex()
-    .map((id) => {
-      try {
-        const raw = localStorage.getItem(metaKey(id));
-        return raw ? (JSON.parse(raw) as Book) : null;
-      } catch {
-        return null;
-      }
-    })
+    .map(getCachedBookMeta)
     .filter((b): b is Book => b !== null);
 }
 
 /** Best-effort cache of a book's metadata so the reader can still open it (title, format, etc.) when the initial `GET /books/:id` fails offline — kept for every book ever opened, not just ones downloaded for offline reading, since it's tiny. */
 export function cacheBookMeta(book: Book): void {
-  try {
-    localStorage.setItem(metaKey(book.id), JSON.stringify(book));
-  } catch {
-    // best-effort only
-  }
+  writeJSON(metaKey(book.id), book);
 }
 
 export function getCachedBookMeta(bookId: string): Book | null {
-  try {
-    const raw = localStorage.getItem(metaKey(bookId));
-    return raw ? (JSON.parse(raw) as Book) : null;
-  } catch {
-    return null;
-  }
+  return readJSON<Book>(metaKey(bookId));
 }
 
 async function cacheUrl(cache: Cache, fetchUrl: string, cacheKey: string, onProgress?: (fraction: number) => void): Promise<void> {

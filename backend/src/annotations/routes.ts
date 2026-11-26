@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { db } from '../database/db.js';
 import { requireAuth } from '../middleware/auth.js';
 import { AppError, asyncRoute } from '../middleware/errors.js';
-import { getOwnedBook } from '../books/access.js';
+import { getOwnedBook, getOwnedRow } from '../books/access.js';
 import { broadcastBookContent } from '../sync/hub.js';
 
 export const annotationsRouter = Router();
@@ -43,11 +43,7 @@ function toDto(row: AnnotationRow) {
   };
 }
 
-function getOwnedAnnotation(userId: string, id: string): AnnotationRow {
-  const row = db.prepare(`SELECT * FROM annotations WHERE id = ?`).get(id) as AnnotationRow | undefined;
-  if (!row || row.userId !== userId) throw new AppError(404, 'Annotation not found');
-  return row;
-}
+const getOwnedAnnotation = (userId: string, id: string) => getOwnedRow<AnnotationRow>('annotations', id, userId, 'Annotation');
 
 const VALID_TYPES = new Set(['highlight', 'note']);
 const VALID_COLORS = new Set(['yellow', 'green', 'blue', 'pink', 'purple']);

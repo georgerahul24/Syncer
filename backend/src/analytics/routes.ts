@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { db } from '../database/db.js';
 import { requireAuth } from '../middleware/auth.js';
 import { AppError, asyncRoute } from '../middleware/errors.js';
+import { clamp01 } from '../middleware/validate.js';
 import { getOwnedBook } from '../books/access.js';
 
 export const analyticsRouter = Router();
@@ -28,8 +29,8 @@ analyticsRouter.post(
     if (typeof startProgress !== 'number' || typeof endProgress !== 'number') {
       throw new AppError(400, 'startProgress and endProgress are required');
     }
-    const clampedStart = Math.max(0, Math.min(1, startProgress));
-    const clampedEnd = Math.max(0, Math.min(1, endProgress));
+    const clampedStart = clamp01(startProgress);
+    const clampedEnd = clamp01(endProgress);
     const pageCount = book.pageCount ?? DEFAULT_PAGE_COUNT_ESTIMATE;
     // readProgressDelta (when the client sends it — see
     // useReadingSessionTracker.ts) is how much of the book was actually
@@ -40,7 +41,7 @@ analyticsRouter.post(
     // all move startProgress/endProgress (correctly — that's still where
     // you ended up) without the delta between them ever having been read.
     const readDelta = typeof readProgressDelta === 'number' && Number.isFinite(readProgressDelta)
-      ? Math.max(0, Math.min(1, readProgressDelta))
+      ? clamp01(readProgressDelta)
       : 0;
     const pagesRead = Math.max(0, Math.round(readDelta * pageCount));
 
@@ -62,6 +63,36 @@ interface AggRow {
   firstReadAt: string | null;
   lastReadAt: string | null;
   pagesRead: number | null;
+}
+
+/** Totals over the reading-session log rows matching `where`, shaped for the API. */
+function sessionTotals(where: string, ...params: string[]) {
+  const agg = db
+    .prepare(
+      `SELECT COALESCE(SUM(durationSeconds),0) AS totalSeconds,
+              COUNT(*) AS sessionCount,
+              COALESCE(MAX(endProgress),0) AS maxProgress,
+              COALESCE(SUM(pagesRead),0) AS pagesRead,
+              MIN(startedAt) AS firstReadAt,
+              MAX(endedAt) AS lastReadAt
+       FROM reading_sessions_log WHERE ${where}`
+    )
+    .get(...params) as AggRow;
+  const totalSeconds = agg.totalSeconds ?? 0;
+  const sessionCount = agg.sessionCount ?? 0;
+  const pagesRead = agg.pagesRead ?? 0;
+  return {
+    maxProgress: agg.maxProgress ?? 0,
+    totals: {
+      totalSeconds,
+      sessionCount,
+      avgSessionSeconds: sessionCount > 0 ? Math.round(totalSeconds / sessionCount) : 0,
+      pagesRead,
+      estimatedCharactersRead: Math.round(pagesRead * CHARS_PER_PAGE_ESTIMATE),
+      firstReadAt: agg.firstReadAt,
+      lastReadAt: agg.lastReadAt,
+    },
+  };
 }
 
 function computeStreaks(days: string[]): { current: number; longest: number } {
@@ -97,16 +128,7 @@ function computeStreaks(days: string[]): { current: number; longest: number } {
 analyticsRouter.get(
   '/analytics/overview',
   asyncRoute(async (req, res) => {
-    const agg = db
-      .prepare(
-        `SELECT COALESCE(SUM(durationSeconds),0) AS totalSeconds,
-                COUNT(*) AS sessionCount,
-                COALESCE(SUM(pagesRead),0) AS pagesRead,
-                MIN(startedAt) AS firstReadAt,
-                MAX(endedAt) AS lastReadAt
-         FROM reading_sessions_log WHERE userId = ?`
-      )
-      .get(req.userId) as AggRow;
+    const { totals } = sessionTotals('userId = ?', req.userId!);
 
     const distinctBooks = (
       db.prepare(`SELECT COUNT(DISTINCT bookId) AS c FROM reading_sessions_log WHERE userId = ?`).get(req.userId) as {
@@ -132,19 +154,11 @@ analyticsRouter.get(
       )
       .all(req.userId) as Array<{ day: string; seconds: number }>;
 
-    const totalSeconds = agg.totalSeconds ?? 0;
-    const sessionCount = agg.sessionCount ?? 0;
     res.json({
-      totalSeconds,
-      sessionCount,
+      ...totals,
       booksRead: distinctBooks,
-      pagesRead: agg.pagesRead ?? 0,
-      estimatedCharactersRead: Math.round((agg.pagesRead ?? 0) * CHARS_PER_PAGE_ESTIMATE),
-      avgSessionSeconds: sessionCount > 0 ? Math.round(totalSeconds / sessionCount) : 0,
       currentStreakDays: current,
       longestStreakDays: longest,
-      firstReadAt: agg.firstReadAt,
-      lastReadAt: agg.lastReadAt,
       last14Days: last14,
       isEstimate: { estimatedCharactersRead: true, pagesRead: true },
     });
@@ -155,29 +169,10 @@ analyticsRouter.get(
   '/books/:id/analytics',
   asyncRoute(async (req, res) => {
     const book = getOwnedBook(req.userId!, req.params.id);
-    const agg = db
-      .prepare(
-        `SELECT COALESCE(SUM(durationSeconds),0) AS totalSeconds,
-                COUNT(*) AS sessionCount,
-                COALESCE(MAX(endProgress),0) AS maxProgress,
-                COALESCE(SUM(pagesRead),0) AS pagesRead,
-                MIN(startedAt) AS firstReadAt,
-                MAX(endedAt) AS lastReadAt
-         FROM reading_sessions_log WHERE userId = ? AND bookId = ?`
-      )
-      .get(req.userId, book.id) as AggRow;
-
-    const totalSeconds = agg.totalSeconds ?? 0;
-    const sessionCount = agg.sessionCount ?? 0;
+    const { totals, maxProgress } = sessionTotals('userId = ? AND bookId = ?', req.userId!, book.id);
     res.json({
-      totalSeconds,
-      sessionCount,
-      avgSessionSeconds: sessionCount > 0 ? Math.round(totalSeconds / sessionCount) : 0,
-      maxProgress: agg.maxProgress ?? 0,
-      pagesRead: agg.pagesRead ?? 0,
-      estimatedCharactersRead: Math.round((agg.pagesRead ?? 0) * CHARS_PER_PAGE_ESTIMATE),
-      firstReadAt: agg.firstReadAt,
-      lastReadAt: agg.lastReadAt,
+      ...totals,
+      maxProgress,
       isEstimate: { estimatedCharactersRead: true, pagesRead: !book.pageCount },
     });
   })

@@ -1,28 +1,17 @@
-import { randomUUID } from 'node:crypto';
-import os from 'node:os';
-import path from 'node:path';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { startTestServer, TestClient } from '../test/helpers.js';
 
-process.env.DATA_DIR = path.join(os.tmpdir(), `syncer-test-${randomUUID()}`);
-
-const { createApp } = await import('../app.js');
-const { listen, TestClient } = await import('../test/helpers.js');
-
-const { baseUrl, server } = await listen(createApp());
-test.after(() => server.close());
+const { baseUrl } = await startTestServer();
 
 async function newUser() {
   const client = new TestClient(baseUrl);
-  await client.post('/api/auth/register', { email: `txt-${randomUUID()}@example.com`, password: 'correct-horse' });
+  await client.register();
   return client;
 }
 
-async function uploadTxt(client: InstanceType<typeof TestClient>, content: string, filename = 'notes.txt') {
-  const form = new FormData();
-  form.append('file', new Blob([content], { type: 'text/plain' }), filename);
-  const res = await fetch(`${baseUrl}/api/books`, { method: 'POST', headers: { Cookie: client.cookieHeader! }, body: form });
-  return res;
+function uploadTxt(client: TestClient, content: string, filename = 'notes.txt') {
+  return client.upload(content, filename, { type: 'text/plain' });
 }
 
 test('uploads a .txt file, defaulting the title to the filename', async () => {
@@ -41,9 +30,7 @@ test('uploads a .txt file, defaulting the title to the filename', async () => {
 test('rejects a binary file even without a recognized magic number', async () => {
   const client = await newUser();
   const junk = Buffer.from([0x00, 0x01, 0x02, 0xff, 0xfe, 0x10, 0x20, 0x30, 0x00, 0x00]);
-  const form = new FormData();
-  form.append('file', new Blob([junk]), 'mystery.bin');
-  const res = await fetch(`${baseUrl}/api/books`, { method: 'POST', headers: { Cookie: client.cookieHeader! }, body: form });
+  const res = await client.upload(junk, 'mystery.bin');
   assert.equal(res.status, 400);
 });
 
@@ -67,7 +54,7 @@ test('a non-txt book cannot be edited via the content endpoint', async () => {
   const client = await newUser();
   const created = await (await uploadTxt(client, 'x')).json();
   const other = new TestClient(baseUrl);
-  await other.post('/api/auth/register', { email: `txt-other-${randomUUID()}@example.com`, password: 'correct-horse' });
+  await other.register();
   const res = await other.put(`/api/books/${created.id}/content`, { content: 'hijacked' });
   assert.equal(res.status, 404, "another user's book must 404, not leak a 400");
 });

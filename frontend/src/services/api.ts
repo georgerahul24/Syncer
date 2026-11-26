@@ -1,4 +1,4 @@
-import type { Annotation, Book, BookStats, Folder, InkStroke, NewAnnotationInput, NotebookPage, OverviewStats, ReadingPosition, SearchResult, Tag, User } from '../types';
+import type { Annotation, Book, BookStats, Folder, InkStroke, NewAnnotationInput, NotebookLocation, NotebookPage, OverviewStats, SearchResult, Tag, User } from '../types';
 import { forgetResolvedBase, getApiBase, getApiBaseSync, isNativeApp } from './serverConfig';
 import { getStoredToken, setStoredToken } from './authToken';
 
@@ -168,12 +168,6 @@ export const tags = {
 };
 
 export const progress = {
-  get: (bookId: string) => request<ReadingPosition | null>(`/books/${bookId}/progress`),
-  put: (bookId: string, body: { locationType: string; location: unknown; progress: number }) =>
-    request<{ shared: boolean; revision?: number }>(`/books/${bookId}/progress`, {
-      method: 'PUT',
-      body: JSON.stringify(body),
-    }),
   /** Best-effort save on page unload; can't use fetch reliably in that context. */
   beacon: (bookId: string, body: { locationType: string; location: unknown; progress: number }) => {
     // sendBeacon can't set an Authorization header — native carries its
@@ -206,7 +200,7 @@ export const annotations = {
 
 export const notebookPages = {
   list: (bookId: string) => request<NotebookPage[]>(`/books/${bookId}/notebook-pages`),
-  create: (bookId: string, location: { afterPage: number } | { overlayPage: number }, initial?: { text?: string; strokes?: InkStroke[] }) =>
+  create: (bookId: string, location: NotebookLocation, initial?: { text?: string; strokes?: InkStroke[] }) =>
     request<NotebookPage>(`/books/${bookId}/notebook-pages`, { method: 'POST', body: JSON.stringify({ ...location, ...initial }) }),
   update: (id: string, patch: { text?: string; strokes?: InkStroke[] }) =>
     request<NotebookPage>(`/notebook-pages/${id}`, { method: 'PUT', body: JSON.stringify(patch) }),

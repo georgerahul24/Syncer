@@ -5,6 +5,7 @@ import { useNativeFileOpen } from './hooks/useNativeFileOpen';
 import LibraryPage from './pages/LibraryPage';
 import UpdateBanner from './components/UpdateBanner';
 import { useAppUpdate } from './hooks/useAppUpdate';
+import { runWhenIdle } from './utils/idle';
 
 // The library is the page almost every launch lands on, so it ships in the
 // main bundle. Everything else — the readers carry pdf.js and epub.js, by far
@@ -16,9 +17,7 @@ const DashboardPage = lazy(() => import('./pages/DashboardPage'));
 // Warm the reader chunk once the library is idle, so the first tap on a
 // book doesn't also wait on downloading the reader code.
 function prefetchReader() {
-  const run = () => void import('./pages/ReaderPage');
-  if ('requestIdleCallback' in window) window.requestIdleCallback(run, { timeout: 4000 });
-  else setTimeout(run, 2000);
+  runWhenIdle(() => void import('./pages/ReaderPage'), 4000, 2000);
 }
 
 export default function App() {

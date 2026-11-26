@@ -1,46 +1,21 @@
 import { randomUUID } from 'node:crypto';
-import os from 'node:os';
-import path from 'node:path';
-import fs from 'node:fs';
-import { fileURLToPath } from 'node:url';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { WebSocket } from 'ws';
+import { startTestServer, newUserWithBook as newUserWithBookAt } from '../test/helpers.js';
 
-process.env.DATA_DIR = path.join(os.tmpdir(), `syncer-test-${randomUUID()}`);
-
-const { createApp } = await import('../app.js');
+const { baseUrl, server } = await startTestServer();
 const { attachWebSocketServer } = await import('../websocket/server.js');
-const { listen, TestClient } = await import('../test/helpers.js');
-
-const { baseUrl, server } = await listen(createApp());
 const wss = attachWebSocketServer(server);
 const wsBaseUrl = baseUrl.replace('http', 'ws');
+// Force-close sockets rather than waiting for graceful close handshakes: a
+// failed assertion earlier in the file can otherwise skip a test's own
+// `ws.close()` and leave a handle open forever.
 test.after(() => {
-  // Force-close everything rather than waiting for graceful close
-  // handshakes — a failed assertion earlier in the file can otherwise skip
-  // a test's own `ws.close()` and leave a handle open forever.
   for (const client of wss.clients) client.terminate();
-  server.closeAllConnections?.();
-  server.close();
 });
 
-const fixturesDir = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'test', 'fixtures');
-const pdfBytes = fs.readFileSync(path.join(fixturesDir, 'sample.pdf'));
-
-async function newUserWithBook() {
-  const client = new TestClient(baseUrl);
-  await client.post('/api/auth/register', { email: `sync-${randomUUID()}@example.com`, password: 'correct-horse' });
-  const form = new FormData();
-  form.append('file', new Blob([pdfBytes]), 'book.pdf');
-  const uploadRes = await fetch(`${baseUrl}/api/books`, {
-    method: 'POST',
-    headers: { Cookie: client.cookieHeader! },
-    body: form,
-  });
-  const book = await uploadRes.json();
-  return { client, book };
-}
+const newUserWithBook = () => newUserWithBookAt(baseUrl);
 
 // The `ws` client can emit 'open' and the first 'message' synchronously
 // within the same tick (e.g. when the server's handshake response and its

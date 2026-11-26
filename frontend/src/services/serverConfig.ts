@@ -1,3 +1,5 @@
+import { readJSON, readString, writeJSON, writeString } from '../utils/storage';
+
 // Resolves which backend base URL to talk to.
 //
 // The web/installed-PWA build is served BY the backend (same origin), so
@@ -56,13 +58,7 @@ async function probe(base: string, timeoutMs: number): Promise<boolean> {
   }
 }
 
-function readLastGood(): string | null {
-  try {
-    return localStorage.getItem(LAST_GOOD_KEY);
-  } catch {
-    return null;
-  }
-}
+const readLastGood = () => readString(LAST_GOOD_KEY);
 
 let resolved: Promise<string> | null = null;
 // Synchronous mirror of the resolved base, for call sites that can't await
@@ -109,15 +105,8 @@ export function normalizeServerUrl(input: string): string | null {
 
 /** The server addresses this device tries, in the user's order. */
 export function getServerList(): string[] {
-  try {
-    const raw = localStorage.getItem(SERVERS_KEY);
-    if (raw) {
-      const list = JSON.parse(raw);
-      if (Array.isArray(list)) return list.filter((u): u is string => typeof u === 'string' && !!u);
-    }
-  } catch {
-    // fall through to the defaults
-  }
+  const saved = readJSON<unknown>(SERVERS_KEY);
+  if (Array.isArray(saved)) return saved.filter((u): u is string => typeof u === 'string' && !!u);
   if (DEFAULT_SERVERS.length) return [...DEFAULT_SERVERS];
   // Public release builds carry no addresses (they're downloadable by anyone).
   // An app updated from an older build still knows the server it last
@@ -129,13 +118,8 @@ export function getServerList(): string[] {
 /** Saves the list and re-resolves on the next request. An empty list restores the defaults. */
 export function setServerList(list: string[]): void {
   const cleaned = [...new Set(list.map(normalizeServerUrl).filter((u): u is string => !!u))];
-  try {
-    if (cleaned.length) localStorage.setItem(SERVERS_KEY, JSON.stringify(cleaned));
-    else localStorage.removeItem(SERVERS_KEY);
-    localStorage.removeItem(LAST_GOOD_KEY);
-  } catch {
-    // best-effort only
-  }
+  writeJSON(SERVERS_KEY, cleaned.length ? cleaned : null);
+  writeString(LAST_GOOD_KEY, null);
   forgetResolvedBase();
 }
 
@@ -216,11 +200,7 @@ async function resolveBase(): Promise<string> {
     setConnection('offline');
     return readLastGood() ?? getServerList()[0] ?? '';
   }
-  try {
-    localStorage.setItem(LAST_GOOD_KEY, winner.base);
-  } catch {
-    // ignore
-  }
+  writeString(LAST_GOOD_KEY, winner.base);
   setConnection(winner.kind);
   return winner.base;
 }

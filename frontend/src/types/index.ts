@@ -172,6 +172,9 @@ export interface SearchResult {
   annotationId?: string;
 }
 
+/** Where a new notebook page goes: a blank page after a real one, or ink over a real page. */
+export type NotebookLocation = { afterPage: number } | { overlayPage: number };
+
 export interface NotebookPage {
   id: string;
   bookId: string;

@@ -1,43 +1,20 @@
-import { randomUUID } from 'node:crypto';
-import os from 'node:os';
 import path from 'node:path';
 import fs from 'node:fs';
-import { fileURLToPath } from 'node:url';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { startTestServer, TestClient, pdfBytes, epubBytes } from '../test/helpers.js';
 
-process.env.DATA_DIR = path.join(os.tmpdir(), `syncer-test-${randomUUID()}`);
+const { baseUrl } = await startTestServer();
 
-const { createApp } = await import('../app.js');
-const { listen, TestClient } = await import('../test/helpers.js');
-
-const { baseUrl, server } = await listen(createApp());
-test.after(() => server.close());
-
-const fixturesDir = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'test', 'fixtures');
-const pdfBytes = fs.readFileSync(path.join(fixturesDir, 'sample.pdf'));
-const epubBytes = fs.readFileSync(path.join(fixturesDir, 'sample.epub'));
-
-async function newUser(email: string) {
+async function newUser() {
   const client = new TestClient(baseUrl);
-  const res = await client.post('/api/auth/register', { email, password: 'correct-horse' });
-  const user = await res.json();
+  const user = await (await client.register()).json();
   return { client, user };
 }
 
-function uploadForm(bytes: Buffer, filename: string) {
-  const form = new FormData();
-  form.append('file', new Blob([bytes]), filename);
-  return form;
-}
-
 test('uploading a PDF stores it, extracts metadata, and lists it in the library', async () => {
-  const { client } = await newUser(`pdf-${randomUUID()}@example.com`);
-  const uploadRes = await fetch(`${baseUrl}/api/books`, {
-    method: 'POST',
-    headers: { Cookie: client.cookieHeader! },
-    body: uploadForm(pdfBytes, 'book.pdf'),
-  });
+  const { client } = await newUser();
+  const uploadRes = await client.upload(pdfBytes, 'book.pdf');
   assert.equal(uploadRes.status, 201);
   const book = await uploadRes.json();
   assert.equal(book.format, 'pdf');
@@ -51,12 +28,8 @@ test('uploading a PDF stores it, extracts metadata, and lists it in the library'
 });
 
 test('uploading an EPUB stores it and extracts title/author', async () => {
-  const { client } = await newUser(`epub-${randomUUID()}@example.com`);
-  const uploadRes = await fetch(`${baseUrl}/api/books`, {
-    method: 'POST',
-    headers: { Cookie: client.cookieHeader! },
-    body: uploadForm(epubBytes, 'book.epub'),
-  });
+  const { client } = await newUser();
+  const uploadRes = await client.upload(epubBytes, 'book.epub');
   assert.equal(uploadRes.status, 201);
   const book = await uploadRes.json();
   assert.equal(book.format, 'epub');
@@ -68,32 +41,21 @@ test('rejects a file that is not actually a PDF or EPUB despite its extension', 
   // Plain readable text despite the .pdf name is now legitimately accepted
   // as a .txt book (see books/txt.test.ts) — genuine binary garbage (a NUL
   // byte makes it unambiguous) is what should still be rejected outright.
-  const { client } = await newUser(`fake-${randomUUID()}@example.com`);
-  const uploadRes = await fetch(`${baseUrl}/api/books`, {
-    method: 'POST',
-    headers: { Cookie: client.cookieHeader! },
-    body: uploadForm(Buffer.from([0x00, 0x01, 0x02, 0xff, 0xfe, 0x10, 0x20, 0x30, 0x00, 0x00]), 'book.pdf'),
-  });
+  const { client } = await newUser();
+  const uploadRes = await client.upload(Buffer.from([0x00, 0x01, 0x02, 0xff, 0xfe, 0x10, 0x20, 0x30, 0x00, 0x00]), 'book.pdf');
   assert.equal(uploadRes.status, 400);
 });
 
 test('upload requires authentication', async () => {
-  const uploadRes = await fetch(`${baseUrl}/api/books`, {
-    method: 'POST',
-    body: uploadForm(pdfBytes, 'book.pdf'),
-  });
+  const uploadRes = await new TestClient(baseUrl).upload(pdfBytes, 'book.pdf');
   assert.equal(uploadRes.status, 401);
 });
 
 test('a user cannot access, download, or delete another user\'s book by ID', async () => {
-  const owner = await newUser(`owner-${randomUUID()}@example.com`);
-  const intruder = await newUser(`intruder-${randomUUID()}@example.com`);
+  const owner = await newUser();
+  const intruder = await newUser();
 
-  const uploadRes = await fetch(`${baseUrl}/api/books`, {
-    method: 'POST',
-    headers: { Cookie: owner.client.cookieHeader! },
-    body: uploadForm(pdfBytes, 'book.pdf'),
-  });
+  const uploadRes = await owner.client.upload(pdfBytes, 'book.pdf');
   const book = await uploadRes.json();
 
   assert.equal((await intruder.client.get(`/api/books/${book.id}`)).status, 404);
@@ -105,12 +67,8 @@ test('a user cannot access, download, or delete another user\'s book by ID', asy
 });
 
 test('deleting a book removes it from the library and from disk', async () => {
-  const { client } = await newUser(`delete-${randomUUID()}@example.com`);
-  const uploadRes = await fetch(`${baseUrl}/api/books`, {
-    method: 'POST',
-    headers: { Cookie: client.cookieHeader! },
-    body: uploadForm(pdfBytes, 'book.pdf'),
-  });
+  const { client } = await newUser();
+  const uploadRes = await client.upload(pdfBytes, 'book.pdf');
   const book = await uploadRes.json();
 
   assert.equal((await client.delete(`/api/books/${book.id}`)).status, 204);

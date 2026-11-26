@@ -1,5 +1,6 @@
 import { appRelease } from './api';
 import { isNativeApp } from './serverConfig';
+import { readString, writeString } from '../utils/storage';
 
 // Every push to main that touches the app publishes a GitHub release
 // (.github/workflows/release.yml). Both native apps watch for them:
@@ -55,13 +56,7 @@ function isNewer(a: string, b: string): boolean {
   return false;
 }
 
-function wasDismissed(version: string): boolean {
-  try {
-    return localStorage.getItem(DISMISSED_KEY) === version;
-  } catch {
-    return false;
-  }
-}
+const wasDismissed = (version: string) => readString(DISMISSED_KEY) === version;
 
 export async function getAppVersion(): Promise<string | null> {
   if (!isNativeApp()) return null;
@@ -139,12 +134,6 @@ export function installUpdate(): void {
 
 /** Hides the banner; an automatic check won't offer this version again, a manual one will. */
 export function dismissUpdate(): void {
-  if (current.state === 'available') {
-    try {
-      localStorage.setItem(DISMISSED_KEY, current.version);
-    } catch {
-      // best-effort only
-    }
-  }
+  if (current.state === 'available') writeString(DISMISSED_KEY, current.version);
   set({ state: 'idle' });
 }

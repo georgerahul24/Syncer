@@ -1,37 +1,11 @@
-import { randomUUID } from 'node:crypto';
-import os from 'node:os';
-import path from 'node:path';
-import fs from 'node:fs';
-import { fileURLToPath } from 'node:url';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { startTestServer, TestClient, newUserWithBook } from '../test/helpers.js';
 
-process.env.DATA_DIR = path.join(os.tmpdir(), `syncer-test-${randomUUID()}`);
-
-const { createApp } = await import('../app.js');
-const { listen, TestClient } = await import('../test/helpers.js');
-
-const { baseUrl, server } = await listen(createApp());
-test.after(() => server.close());
-
-const fixturesDir = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'test', 'fixtures');
-const pdfBytes = fs.readFileSync(path.join(fixturesDir, 'sample.pdf'));
-
-async function newUserWithBook() {
-  const client = new TestClient(baseUrl);
-  await client.post('/api/auth/register', { email: `ann-${randomUUID()}@example.com`, password: 'correct-horse' });
-  const form = new FormData();
-  form.append('file', new Blob([pdfBytes]), 'book.pdf');
-  const uploadRes = await fetch(`${baseUrl}/api/books`, {
-    method: 'POST',
-    headers: { Cookie: client.cookieHeader! },
-    body: form,
-  });
-  return { client, book: await uploadRes.json() };
-}
+const { baseUrl } = await startTestServer();
 
 test('create, list, edit, and delete an annotation', async () => {
-  const { client, book } = await newUserWithBook();
+  const { client, book } = await newUserWithBook(baseUrl);
 
   const createRes = await client.post(`/api/books/${book.id}/annotations`, {
     type: 'highlight',
@@ -65,7 +39,7 @@ test('create, list, edit, and delete an annotation', async () => {
 });
 
 test('annotations persist independently of screen/zoom by storing opaque location data', async () => {
-  const { client, book } = await newUserWithBook();
+  const { client, book } = await newUserWithBook(baseUrl);
   const res = await client.post(`/api/books/${book.id}/annotations`, {
     type: 'note',
     locationType: 'pdf',
@@ -78,9 +52,9 @@ test('annotations persist independently of screen/zoom by storing opaque locatio
 });
 
 test('a user cannot read, edit, or delete another user\'s annotation', async () => {
-  const owner = await newUserWithBook();
+  const owner = await newUserWithBook(baseUrl);
   const intruderClient = new TestClient(baseUrl);
-  await intruderClient.post('/api/auth/register', { email: `intruder-${randomUUID()}@example.com`, password: 'correct-horse' });
+  await intruderClient.register();
 
   const createRes = await owner.client.post(`/api/books/${owner.book.id}/annotations`, {
     type: 'highlight',
@@ -96,7 +70,7 @@ test('a user cannot read, edit, or delete another user\'s annotation', async () 
 });
 
 test('rejects an invalid annotation type', async () => {
-  const { client, book } = await newUserWithBook();
+  const { client, book } = await newUserWithBook(baseUrl);
   const res = await client.post(`/api/books/${book.id}/annotations`, {
     type: 'bogus',
     locationType: 'pdf',

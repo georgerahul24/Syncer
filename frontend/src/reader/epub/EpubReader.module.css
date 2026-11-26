@@ -101,7 +101,8 @@
   font-weight: 600;
 }
 
-/* Page-turn tap zones at the edges. A chevron fades in on hover; no
+/* Page-turn tap zones at the edges. They're empty and invisible; the
+   opacity only keeps the focus outline hidden until keyboard focus. No
    gradient wash, since the page colour comes from the reading theme and
    the app chrome cannot know it. */
 .navZone {
@@ -111,12 +112,7 @@
   width: 12%;
   min-width: 32px;
   max-width: 96px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
   z-index: 5;
-  color: var(--color-text-tertiary);
-  font-size: 1.3rem;
   opacity: 0;
   transition: opacity var(--transition-fast);
 }

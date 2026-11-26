@@ -2,16 +2,10 @@ import { useMemo, useState } from 'react';
 import type { Annotation, AnnotationColor, TocItem } from '../../types';
 import { resolveChapterLabel } from './chapterLabel';
 import NoteEditor from './NoteEditor';
+import { COLORS, COLOR_VAR } from '../HighlightPopup';
 import styles from './AnnotationPanel.module.css';
+import sheet from '../SidePanel.module.css';
 
-const COLORS: AnnotationColor[] = ['yellow', 'green', 'blue', 'pink', 'purple'];
-const COLOR_VAR: Record<AnnotationColor, string> = {
-  yellow: 'var(--color-highlight-yellow)',
-  green: 'var(--color-highlight-green)',
-  blue: 'var(--color-highlight-blue)',
-  pink: 'var(--color-highlight-pink)',
-  purple: 'var(--color-highlight-purple)',
-};
 
 type Filter = 'all' | 'highlights' | 'notes' | AnnotationColor;
 
@@ -56,10 +50,10 @@ export default function AnnotationPanel({
   }, [filtered, toc]);
 
   return (
-    <aside className={`${styles.panel} ${open ? styles.panelOpen : ''}`} aria-hidden={!open}>
+    <aside className={`${sheet.panel} ${sheet.right} ${styles.panel} ${open ? sheet.panelOpen : ''}`} aria-hidden={!open}>
       <div className={styles.header}>
-        <span className={styles.headerTitle}>Annotations</span>
-        <button type="button" className={styles.closeButton} onClick={onClose} aria-label="Close annotations">
+        <span className={sheet.headerTitle}>Annotations</span>
+        <button type="button" className={sheet.closeButton} onClick={onClose} aria-label="Close annotations">
           ✕
         </button>
       </div>

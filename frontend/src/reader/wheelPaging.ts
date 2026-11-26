@@ -14,7 +14,7 @@
  *
  * Down or right means next page. Up or left means previous.
  */
-export type WheelPager = {
+type WheelPager = {
   onWheel: (e: WheelEvent) => void;
   dispose: () => void;
 };
@@ -22,8 +22,15 @@ export type WheelPager = {
 const TURN_PX = 30; // travel within one gesture that turns the page
 const QUIET_MS = 180; // a gap this long ends the gesture
 const MIN_REPEAT_MS = 350; // never turn twice faster than this
-const NEW_FLICK_RATIO = 2.5; // jump in size that marks a fresh flick mid-momentum
+// Momentum only ever shrinks, so a delta this many times bigger than the one
+// before it is a fresh flick starting mid-momentum.
+export const NEW_SWIPE_RATIO = 2.5;
 const NEW_FLICK_MIN_PX = 20;
+
+/** A wheel event's `delta` in pixels: deltaMode 1 is lines (Firefox with a mouse wheel), 2 is pages. */
+export function wheelDeltaPx(e: WheelEvent, delta: number, pagePx: number): number {
+  return Math.abs(delta) * (e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? pagePx : 1);
+}
 
 export function createWheelPager(turn: (direction: 1 | -1) => void): WheelPager {
   let acc = 0;
@@ -60,8 +67,7 @@ export function createWheelPager(turn: (direction: 1 | -1) => void): WheelPager 
     if (e.ctrlKey) return;
     const raw = Math.abs(e.deltaY) >= Math.abs(e.deltaX) ? e.deltaY : e.deltaX;
     if (raw === 0) return;
-    // deltaMode 1 = lines (Firefox with a mouse wheel), 2 = pages.
-    const mag = Math.abs(raw) * (e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? 400 : 1);
+    const mag = wheelDeltaPx(e, raw, 400);
     const direction: 1 | -1 = raw > 0 ? 1 : -1;
 
     clearTimeout(quietTimer);
@@ -70,7 +76,7 @@ export function createWheelPager(turn: (direction: 1 | -1) => void): WheelPager 
     const now = performance.now();
     if (locked) {
       const freshFlick =
-        mag >= NEW_FLICK_MIN_PX && mag > lastMag * NEW_FLICK_RATIO && now - lastTurnAt >= MIN_REPEAT_MS;
+        mag >= NEW_FLICK_MIN_PX && mag > lastMag * NEW_SWIPE_RATIO && now - lastTurnAt >= MIN_REPEAT_MS;
       lastMag = mag;
       if (!freshFlick) return;
       doTurn(direction);

@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { db } from '../database/db.js';
 import { requireAuth } from '../middleware/auth.js';
 import { AppError, asyncRoute } from '../middleware/errors.js';
-import { getOwnedBook } from '../books/access.js';
+import { getOwnedBook, getOwnedRow } from '../books/access.js';
 import { broadcastBookContent } from '../sync/hub.js';
 
 export const notebookRouter = Router();
@@ -35,11 +35,7 @@ function toDto(row: NotebookPageRow) {
   };
 }
 
-function getOwnedNotebookPage(userId: string, id: string): NotebookPageRow {
-  const row = db.prepare(`SELECT * FROM notebook_pages WHERE id = ?`).get(id) as NotebookPageRow | undefined;
-  if (!row || row.userId !== userId) throw new AppError(404, 'Notebook page not found');
-  return row;
-}
+const getOwnedNotebookPage = (userId: string, id: string) => getOwnedRow<NotebookPageRow>('notebook_pages', id, userId, 'Notebook page');
 
 notebookRouter.get(
   '/books/:bookId/notebook-pages',

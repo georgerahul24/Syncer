@@ -34,7 +34,6 @@ export default memo(function PdfPage({
   active,
   placeholderWidth,
   placeholderHeight,
-  onMeasured,
   registerNode,
   highlights,
   focusedAnnotationId,
@@ -52,7 +51,6 @@ export default memo(function PdfPage({
   active: boolean;
   placeholderWidth: number;
   placeholderHeight: number;
-  onMeasured: (page: number, width: number, height: number) => void;
   registerNode: (page: number, el: HTMLDivElement | null) => void;
   highlights: Annotation[];
   focusedAnnotationId: string | null;
@@ -119,7 +117,6 @@ export default memo(function PdfPage({
       const cssHeight = Math.floor(viewport.height);
       if (cssWidth !== sizeRef.current.width || cssHeight !== sizeRef.current.height) {
         setSize({ width: cssWidth, height: cssHeight });
-        onMeasured(pageNumber, cssWidth, cssHeight);
       }
 
       renderTask = page.render({
@@ -152,7 +149,7 @@ export default memo(function PdfPage({
       textLayer?.cancel();
       setRendered(false);
     };
-  }, [doc, pageNumber, scale, active, onMeasured]);
+  }, [doc, pageNumber, scale, active]);
 
   // A brief hold-off before the highlight popup appears: a plain tap on a
   // word can leave the browser with a tiny selection for a moment (mobile

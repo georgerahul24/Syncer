@@ -3,6 +3,7 @@ import type { Annotation, AnnotationColor, NewAnnotationInput } from '../../type
 import { annotations as annotationsApi } from '../../services/api';
 import { enqueue, isNetworkError } from '../../services/offlineQueue';
 import type { AnnotationRemoteEvent } from '../sync/useReaderSync';
+import { mergeRemoteUpsert } from '../sync/mergeRemote';
 
 let tmpCounter = 0;
 
@@ -21,20 +22,12 @@ let tmpCounter = 0;
  */
 export function useAnnotations(bookId: string, remoteEvent?: AnnotationRemoteEvent | null) {
   const [annotations, setAnnotations] = useState<Annotation[]>([]);
-  const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
     if (!remoteEvent) return;
     if (remoteEvent.kind === 'upsert' && remoteEvent.annotation) {
       const incoming = remoteEvent.annotation;
-      setAnnotations((prev) => {
-        const local = prev.find((a) => a.id === incoming.id);
-        // See the matching comment in useNotebookPages.ts: guards against a
-        // slow echo of this session's own older save overwriting a newer
-        // local edit still in flight.
-        if (local && local.updatedAt > incoming.updatedAt) return prev;
-        return local ? prev.map((a) => (a.id === incoming.id ? incoming : a)) : [...prev, incoming];
-      });
+      setAnnotations((prev) => mergeRemoteUpsert(prev, incoming));
     } else if (remoteEvent.kind === 'delete' && remoteEvent.annotationId) {
       const id = remoteEvent.annotationId;
       setAnnotations((prev) => prev.filter((a) => a.id !== id));
@@ -43,14 +36,10 @@ export function useAnnotations(bookId: string, remoteEvent?: AnnotationRemoteEve
   }, [remoteEvent]);
 
   useEffect(() => {
-    setLoaded(false);
     annotationsApi
       .list(bookId)
-      .then((list) => {
-        setAnnotations(list);
-        setLoaded(true);
-      })
-      .catch(() => setLoaded(true));
+      .then(setAnnotations)
+      .catch(() => {});
   }, [bookId]);
 
   const create = useCallback(
@@ -105,5 +94,5 @@ export function useAnnotations(bookId: string, remoteEvent?: AnnotationRemoteEve
     });
   }, []);
 
-  return { annotations, loaded, create, update, remove };
+  return { annotations, create, update, remove };
 }

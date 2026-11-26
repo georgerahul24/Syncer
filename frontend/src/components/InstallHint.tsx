@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import styles from './InstallHint.module.css';
+import { readString, writeString } from '../utils/storage';
 
 const DISMISSED_KEY = 'syncer.installHintDismissed';
 
@@ -18,22 +19,15 @@ export default function InstallHint() {
 
   useEffect(() => {
     if (window.isSecureContext) return;
-    try {
-      setDismissed(localStorage.getItem(DISMISSED_KEY) === '1');
-    } catch {
-      setDismissed(false); // private mode etc. — showing it once is fine
-    }
+    // Unreadable storage (private mode etc.) shows it, which is fine.
+    setDismissed(readString(DISMISSED_KEY) === '1');
   }, []);
 
   if (dismissed || window.isSecureContext) return null;
 
   const dismiss = () => {
     setDismissed(true);
-    try {
-      localStorage.setItem(DISMISSED_KEY, '1');
-    } catch {
-      // Not being able to remember the dismissal isn't worth surfacing.
-    }
+    writeString(DISMISSED_KEY, '1');
   };
 
   return (

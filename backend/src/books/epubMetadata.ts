@@ -1,8 +1,8 @@
 import AdmZip from 'adm-zip';
 import path from 'node:path';
-import { XMLParser } from 'fast-xml-parser';
+import { resolveRelative, toArray, xmlParser as parser } from './parseUtil.js';
 
-export interface EpubMetadata {
+interface EpubMetadata {
   title: string | null;
   author: string | null;
   identifier: string | null;
@@ -11,13 +11,6 @@ export interface EpubMetadata {
 
 const MAX_XML_ENTRY_BYTES = 5 * 1024 * 1024; // guard against pathological/zip-bomb metadata files
 const MAX_COVER_BYTES = 20 * 1024 * 1024;
-
-const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '@_', removeNSPrefix: true });
-
-function toArray<T>(value: T | T[] | undefined): T[] {
-  if (value === undefined) return [];
-  return Array.isArray(value) ? value : [value];
-}
 
 function textOf(node: unknown): string | null {
   if (node == null) return null;
@@ -38,13 +31,6 @@ function firstText(node: unknown): string | null {
     return null;
   }
   return textOf(node);
-}
-
-// EPUB entry paths use forward slashes regardless of host OS.
-function resolveRelative(baseDir: string, href: string): string {
-  const clean = href.split('#')[0];
-  const joined = baseDir ? `${baseDir}/${clean}` : clean;
-  return path.posix.normalize(joined).replace(/^(\.\.\/)+/, '');
 }
 
 function readEntry(zip: AdmZip, entryPath: string): Buffer | null {

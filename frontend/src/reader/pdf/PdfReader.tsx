@@ -4,7 +4,7 @@ import type { ReaderComponentProps } from '../types';
 import type { Annotation, AnnotationColor, InkStroke, PdfAnnotationLocation, PdfLocation } from '../../types';
 import { usePdfDocument } from './usePdfDocument';
 import PdfPage, { type PendingPdfSelection, type SearchMatchOnPage } from './PdfPage';
-import HighlightPopup from './HighlightPopup';
+import HighlightPopup from '../HighlightPopup';
 import PdfSearchOverlay, { type PdfSearchResult } from './PdfSearchOverlay';
 import type { PdfSearchMatch } from './search';
 import { useReadingSessionTracker } from '../analytics/useReadingSessionTracker';
@@ -13,7 +13,9 @@ import NotebookPageBlock from './NotebookPageBlock';
 import { INK_COLORS, INK_WIDTHS } from './inkConstants';
 import { clampPadding } from '../padding';
 import { createWheelPager } from '../wheelPaging';
+import { isTypingTarget, pageKeyDirection, swipeDirection } from '../input';
 import styles from './PdfReader.module.css';
+import { useDismissOnOutside } from '../../hooks/useDismissOnOutside';
 
 const PRELOAD_MARGIN = '1200px 0px';
 const NO_MATCHES: SearchMatchOnPage[] = [];
@@ -128,15 +130,6 @@ export default function PdfReader({
   const suppressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const appliedRevisionRef = useRef<number | null>(null);
   const appliedRemoteRevisionRef = useRef<number | null>(null);
-
-  // A stable no-op — PdfPage's render effect depends on `onMeasured`, so an
-  // inline `() => {}` here would give it a new identity every PdfReader
-  // re-render (which happens on every scroll tick via `currentPage`), and
-  // that would re-run — and re-cancel — every active page's canvas/text
-  // layer render on every tick. Individual pages self-correct their own
-  // placeholder size (see PdfPage's `size` state); PdfReader doesn't need
-  // to hear about it, but the callback identity still has to be stable.
-  const handleMeasured = useCallback(() => {}, []);
 
   function suppressNextPositionTick() {
     suppressRef.current = true;
@@ -312,11 +305,6 @@ export default function PdfReader({
     const clamped = Number.isFinite(page) ? Math.max(1, Math.min(numPages || 1, Math.round(page))) : 1;
     if (settings.mode === 'paginated') {
       if (clamped !== currentPage) pageTurnDirRef.current = clamped > currentPage ? 1 : -1;
-      setCurrentPage(clamped);
-      if (opts?.discrete && !opts?.suppress) {
-        const loc: PdfLocation = { page: clamped, scrollOffset: 0 };
-        onLocalPositionChange('pdf-page', loc, numPages ? clamped / numPages : 0, { immediate: true });
-      }
     } else {
       // Continuous mode: always suppress the scroll-tracking effect's own
       // detection for a goToPage-initiated jump, discrete or not. goToPage
@@ -327,11 +315,11 @@ export default function PdfReader({
       suppressNextPositionTick();
       const el = nodesRef.current.get(clamped);
       el?.scrollIntoView({ block: 'start' });
-      setCurrentPage(clamped);
-      if (opts?.discrete && !opts?.suppress) {
-        const loc: PdfLocation = { page: clamped, scrollOffset: 0 };
-        onLocalPositionChange('pdf-page', loc, numPages ? clamped / numPages : 0, { immediate: true });
-      }
+    }
+    setCurrentPage(clamped);
+    if (opts?.discrete && !opts?.suppress) {
+      const loc: PdfLocation = { page: clamped, scrollOffset: 0 };
+      onLocalPositionChange('pdf-page', loc, numPages ? clamped / numPages : 0, { immediate: true });
     }
   }
 
@@ -376,10 +364,9 @@ export default function PdfReader({
   // free from native scrolling).
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
-      const tag = (e.target as HTMLElement | null)?.tagName;
-      if (tag === 'INPUT' || tag === 'TEXTAREA' || settings.mode !== 'paginated') return;
-      if (e.key === 'ArrowRight' || e.key === 'PageDown') goToPage(currentPage + 1, { discrete: true });
-      else if (e.key === 'ArrowLeft' || e.key === 'PageUp') goToPage(currentPage - 1, { discrete: true });
+      if (isTypingTarget(e.target) || settings.mode !== 'paginated') return;
+      const direction = pageKeyDirection(e.key);
+      if (direction) goToPage(currentPage + direction, { discrete: true });
       else if (e.key === 'Home') goToPage(1, { discrete: true });
       else if (e.key === 'End') goToPage(numPages, { discrete: true });
     }
@@ -418,21 +405,18 @@ export default function PdfReader({
   }
   function onTouchEnd(e: React.TouchEvent) {
     if (touchStartXRef.current == null || settings.mode !== 'paginated') return;
-    const dx = (e.changedTouches[0]?.clientX ?? touchStartXRef.current) - touchStartXRef.current;
+    const direction = swipeDirection((e.changedTouches[0]?.clientX ?? touchStartXRef.current) - touchStartXRef.current);
     touchStartXRef.current = null;
-    if (dx <= -40) goToPage(currentPage + 1, { discrete: true });
-    else if (dx >= 40) goToPage(currentPage - 1, { discrete: true });
+    if (direction) goToPage(currentPage + direction, { discrete: true });
   }
 
   // Dismiss the highlight-creation popup on any click outside it, without
   // swallowing the click that opens a color swatch (mousedown there calls
   // preventDefault but still bubbles).
   const popupRef = useRef<HTMLDivElement>(null);
+  useDismissOnOutside(popupRef, () => setSelection(null), !!selection);
   useEffect(() => {
     if (!selection) return;
-    function dismissIfOutside(e: MouseEvent | TouchEvent) {
-      if (popupRef.current && !popupRef.current.contains(e.target as Node)) setSelection(null);
-    }
     // iOS in particular can collapse a selection on an outside tap without
     // ever dispatching a synthetic mousedown/click for it — selectionchange
     // is the one signal guaranteed to fire whenever the selection is gone.
@@ -440,14 +424,8 @@ export default function PdfReader({
       const sel = window.getSelection();
       if (!sel || sel.isCollapsed) setSelection(null);
     }
-    window.addEventListener('mousedown', dismissIfOutside);
-    window.addEventListener('touchstart', dismissIfOutside, { passive: true });
     document.addEventListener('selectionchange', dismissIfCollapsed);
-    return () => {
-      window.removeEventListener('mousedown', dismissIfOutside);
-      window.removeEventListener('touchstart', dismissIfOutside);
-      document.removeEventListener('selectionchange', dismissIfCollapsed);
-    };
+    return () => document.removeEventListener('selectionchange', dismissIfCollapsed);
   }, [selection]);
 
   function confirmHighlight(color: AnnotationColor) {
@@ -520,7 +498,6 @@ export default function PdfReader({
                   active={activePages.has(page)}
                   placeholderWidth={placeholderWidth}
                   placeholderHeight={placeholderHeight}
-                  onMeasured={handleMeasured}
                   registerNode={registerNode}
                   highlights={highlightsByPage.get(page) ?? NO_HIGHLIGHTS}
                   focusedAnnotationId={focusAnnotationId}
@@ -563,7 +540,6 @@ export default function PdfReader({
             active
             placeholderWidth={placeholderWidth}
             placeholderHeight={placeholderHeight}
-            onMeasured={handleMeasured}
             registerNode={() => {}}
             highlights={highlightsByPage.get(currentPage) ?? NO_HIGHLIGHTS}
             focusedAnnotationId={focusAnnotationId}

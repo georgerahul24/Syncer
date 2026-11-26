@@ -28,10 +28,11 @@ export function registerSession(sessionId: string, ws: WebSocket, userId: string
   if (!byUserBook.has(key)) byUserBook.set(key, new Set());
   byUserBook.get(key)!.add(sessionId);
 
+  const now = new Date().toISOString();
   db.prepare(
     `INSERT INTO reader_sessions (id, userId, bookId, syncEnabled, lastKnownRevision, lastSeenAt, createdAt)
      VALUES (?, ?, ?, ?, 0, ?, ?)`
-  ).run(sessionId, userId, bookId, syncEnabled ? 1 : 0, new Date().toISOString(), new Date().toISOString());
+  ).run(sessionId, userId, bookId, syncEnabled ? 1 : 0, now, now);
 }
 
 export function unregisterSession(sessionId: string): void {
@@ -50,31 +51,27 @@ export function setSessionSyncEnabled(sessionId: string, enabled: boolean): void
 }
 
 export function touchSession(sessionId: string, revision?: number): void {
-  if (revision === undefined) {
-    db.prepare(`UPDATE reader_sessions SET lastSeenAt = ? WHERE id = ?`).run(new Date().toISOString(), sessionId);
-  } else {
-    db.prepare(`UPDATE reader_sessions SET lastSeenAt = ?, lastKnownRevision = ? WHERE id = ?`).run(
-      new Date().toISOString(),
-      revision,
-      sessionId
-    );
-  }
+  db.prepare(`UPDATE reader_sessions SET lastSeenAt = ?, lastKnownRevision = COALESCE(?, lastKnownRevision) WHERE id = ?`).run(
+    new Date().toISOString(),
+    revision ?? null,
+    sessionId
+  );
 }
 
-interface UserBookSyncFlags {
-  userSyncEnabled: boolean;
-  bookSyncEnabled: boolean;
-}
-
-export function getSyncFlags(userId: string, bookId: string): UserBookSyncFlags | null {
+/** Whether both the account-wide and the per-book sync switches are on. */
+export function isSyncEnabled(userId: string, bookId: string): boolean {
   const row = db
     .prepare(
       `SELECT u.syncEnabled AS userSyncEnabled, b.syncEnabled AS bookSyncEnabled
        FROM users u, books b WHERE u.id = ? AND b.id = ? AND b.userId = u.id`
     )
     .get(userId, bookId) as { userSyncEnabled: number; bookSyncEnabled: number } | undefined;
-  if (!row) return null;
-  return { userSyncEnabled: !!row.userSyncEnabled, bookSyncEnabled: !!row.bookSyncEnabled };
+  return !!row?.userSyncEnabled && !!row?.bookSyncEnabled;
+}
+
+/** The per-session "sync this session" toggle, kept in memory alongside the socket. */
+export function isSessionSyncEnabled(sessionId: string): boolean {
+  return !!connections.get(sessionId)?.syncEnabled;
 }
 
 export interface ProgressRow {
@@ -83,6 +80,17 @@ export interface ProgressRow {
   progress: number;
   revision: number;
   updatedAt: string;
+}
+
+/** A progress row as the API returns it. */
+export function progressToDto(row: ProgressRow) {
+  return {
+    locationType: row.locationType,
+    location: JSON.parse(row.location),
+    progress: row.progress,
+    revision: row.revision,
+    updatedAt: row.updatedAt,
+  };
 }
 
 export function getReadingProgress(userId: string, bookId: string): ProgressRow | null {

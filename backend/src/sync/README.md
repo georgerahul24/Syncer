@@ -68,7 +68,7 @@ Two independent mechanisms prevent this:
 `users.syncEnabled` (global), `books.syncEnabled` (per book), and a
 session's own `sync-toggle` (this tab only, in-memory + mirrored in
 `reader_sessions.syncEnabled`). All three must be true for a `position`
-message to be persisted/broadcast — see `getSyncFlags` + the session-level
+message to be persisted/broadcast — see `isSyncEnabled` + the session-level
 check in `websocket/server.ts`'s `handleMessage`. Disabling any of them
 does **not** delete or reset `reading_progress` — it just means this
 session stops writing to and reading from the shared row. Per-device

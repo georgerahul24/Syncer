@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import { db } from '../database/db.js';
 import { bookFilePath } from '../storage/fileStorage.js';
 import { extractPdfText, extractEpubText, extractTxtText, type ExtractedTextChunk } from '../books/textExtract.js';
+import type { BookFormat } from '../books/access.js';
 
 export function indexBookText(bookId: string, userId: string, chunks: ExtractedTextChunk[]): void {
   if (chunks.length === 0) return;
@@ -24,7 +25,7 @@ export function deleteBookTextIndex(bookId: string): void {
  * encoding, etc.) is logged and swallowed rather than surfaced to the
  * upload flow — a book that fails to index is simply not searchable.
  */
-export async function indexBookAsync(bookId: string, userId: string, format: 'pdf' | 'epub' | 'txt', filePath: string): Promise<void> {
+export async function indexBookAsync(bookId: string, userId: string, format: BookFormat, filePath: string): Promise<void> {
   try {
     const chunks = format === 'pdf' ? await extractPdfText(filePath) : format === 'epub' ? extractEpubText(filePath) : extractTxtText(filePath);
     indexBookText(bookId, userId, chunks);
@@ -53,7 +54,7 @@ export async function backfillMissingTextIndexes(): Promise<void> {
       `SELECT b.id, b.userId, b.format FROM books b
        WHERE NOT EXISTS (SELECT 1 FROM book_text_fts f WHERE f.bookId = b.id)`
     )
-    .all() as Array<{ id: string; userId: string; format: 'pdf' | 'epub' | 'txt' }>;
+    .all() as Array<{ id: string; userId: string; format: BookFormat }>;
 
   for (const book of missing) {
     const filePath = bookFilePath(book.userId, book.id, book.format);

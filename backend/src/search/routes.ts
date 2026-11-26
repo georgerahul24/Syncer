@@ -2,24 +2,20 @@ import { Router } from 'express';
 import { db } from '../database/db.js';
 import { requireAuth } from '../middleware/auth.js';
 import { asyncRoute } from '../middleware/errors.js';
+import type { BookFormat, BookRow } from '../books/access.js';
 
 export const searchRouter = Router();
 searchRouter.use(requireAuth);
 
 const MAX_RESULTS = 40;
 
-interface BookMeta {
-  id: string;
-  title: string;
-  author: string | null;
-  format: 'pdf' | 'epub' | 'txt';
-}
+type BookMeta = Pick<BookRow, 'id' | 'title' | 'author' | 'format'>;
 
-export interface SearchResult {
+interface SearchResult {
   bookId: string;
   bookTitle: string;
   bookAuthor: string | null;
-  format: 'pdf' | 'epub' | 'txt';
+  format: BookFormat;
   kind: 'text' | 'annotation' | 'book';
   snippet: string;
   locationType?: string;

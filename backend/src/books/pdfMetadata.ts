@@ -1,6 +1,6 @@
-import fs from 'node:fs';
+import { withPdfDocument } from './parseUtil.js';
 
-export interface PdfMetadata {
+interface PdfMetadata {
   title: string | null;
   author: string | null;
   pageCount: number;
@@ -15,17 +15,11 @@ export interface PdfMetadata {
  * that can disagree.
  */
 export async function extractPdfMetadata(filePath: string): Promise<PdfMetadata> {
-  const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
-  const data = new Uint8Array(fs.readFileSync(filePath));
-  const doc = await pdfjs.getDocument({ data, isEvalSupported: false }).promise;
-
-  try {
+  return withPdfDocument(filePath, async (doc) => {
     const meta = await doc.getMetadata();
     const info = meta.info as Record<string, unknown>;
     const title = typeof info?.Title === 'string' && info.Title.trim() ? info.Title.trim() : null;
     const author = typeof info?.Author === 'string' && info.Author.trim() ? info.Author.trim() : null;
     return { title, author, pageCount: doc.numPages };
-  } finally {
-    await doc.destroy();
-  }
+  });
 }

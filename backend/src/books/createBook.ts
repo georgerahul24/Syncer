@@ -7,7 +7,7 @@ import { AppError } from '../middleware/errors.js';
 import { bookFilePath, coverFilePath, ensureBookDir, sha256File } from '../storage/fileStorage.js';
 import { extractPdfMetadata } from './pdfMetadata.js';
 import { extractEpubMetadata } from './epubMetadata.js';
-import { getOwnedBook, type BookRow } from './access.js';
+import { getOwnedBook, type BookFormat, type BookRow } from './access.js';
 import { indexBookAsync } from '../search/textIndex.js';
 
 const PDF_MAGIC = Buffer.from('%PDF-');
@@ -47,7 +47,7 @@ function looksLikePlainText(filePath: string): boolean {
 // few bytes of junk before it.
 const PDF_HEADER_WINDOW_BYTES = 1024;
 
-function sniffFormat(filePath: string): 'pdf' | 'epub' | 'txt' | null {
+function sniffFormat(filePath: string): BookFormat | null {
   const fd = fs.openSync(filePath, 'r');
   try {
     const head = Buffer.alloc(PDF_HEADER_WINDOW_BYTES);

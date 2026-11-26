@@ -2,8 +2,9 @@ import { Router } from 'express';
 import { randomUUID } from 'node:crypto';
 import { db } from '../database/db.js';
 import { requireAuth } from '../middleware/auth.js';
-import { AppError, asyncRoute } from '../middleware/errors.js';
-import { getOwnedBook } from '../books/access.js';
+import { asyncRoute } from '../middleware/errors.js';
+import { requireName } from '../middleware/validate.js';
+import { getOwnedBook, getOwnedRow } from '../books/access.js';
 
 export const tagsRouter = Router();
 
@@ -14,17 +15,11 @@ interface TagRow {
   createdAt: string;
 }
 
-function getOwnedTag(userId: string, id: string): TagRow {
-  const row = db.prepare(`SELECT * FROM tags WHERE id = ?`).get(id) as TagRow | undefined;
-  if (!row || row.userId !== userId) throw new AppError(404, 'Tag not found');
-  return row;
-}
+const getOwnedTag = (userId: string, id: string) => getOwnedRow<TagRow>('tags', id, userId, 'Tag');
 
 /** Tags are reused across books — find one by (case-insensitive) name, or create it. */
 function findOrCreateTag(userId: string, rawName: string): TagRow {
-  const name = rawName.trim();
-  if (!name) throw new AppError(400, 'Tag name is required');
-  if (name.length > 50) throw new AppError(400, 'Tag name is too long');
+  const name = requireName(rawName, 'Tag', 50);
   const existing = db
     .prepare(`SELECT * FROM tags WHERE userId = ? AND name = ? COLLATE NOCASE`)
     .get(userId, name) as TagRow | undefined;

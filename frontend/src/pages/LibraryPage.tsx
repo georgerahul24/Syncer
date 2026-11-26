@@ -20,6 +20,7 @@ import { forgetResolvedBase, isNativeApp } from '../services/serverConfig';
 import { flush as flushOfflineQueue } from '../services/offlineQueue';
 import { IconRefresh } from '../reader/icons';
 import styles from './LibraryPage.module.css';
+import { readJSON, writeJSON } from '../utils/storage';
 
 // How recently the shelf must have been refreshed for returning to the tab
 // to skip re-fetching. Long enough that flicking between apps doesn't hammer
@@ -34,22 +35,8 @@ function shelfKey(userId: string | undefined, kind: 'books' | 'folders' | 'tags'
   return `syncer:shelf:${userId ?? 'anon'}:${kind}`;
 }
 
-function readShelf<T>(userId: string | undefined, kind: 'books' | 'folders' | 'tags'): T | null {
-  try {
-    const raw = localStorage.getItem(shelfKey(userId, kind));
-    return raw ? (JSON.parse(raw) as T) : null;
-  } catch {
-    return null;
-  }
-}
-
-function writeShelf(userId: string | undefined, kind: 'books' | 'folders' | 'tags', value: unknown) {
-  try {
-    localStorage.setItem(shelfKey(userId, kind), JSON.stringify(value));
-  } catch {
-    // best-effort only
-  }
-}
+const readShelf = <T,>(userId: string | undefined, kind: 'books' | 'folders' | 'tags') => readJSON<T>(shelfKey(userId, kind));
+const writeShelf = (userId: string | undefined, kind: 'books' | 'folders' | 'tags', value: unknown) => writeJSON(shelfKey(userId, kind), value);
 
 export default function LibraryPage() {
   const { navigate } = useRouter();

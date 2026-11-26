@@ -1,20 +1,8 @@
-import { randomUUID } from 'node:crypto';
-import os from 'node:os';
-import path from 'node:path';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { startTestServer, TestClient } from '../test/helpers.js';
 
-// Must run before any import that transitively touches config/db (they read
-// DATA_DIR at module-evaluation time). Static imports are hoisted above
-// top-level code in ESM, so those modules are loaded dynamically below,
-// after this assignment actually executes.
-process.env.DATA_DIR = path.join(os.tmpdir(), `syncer-test-${randomUUID()}`);
-
-const { createApp } = await import('../app.js');
-const { listen, TestClient } = await import('../test/helpers.js');
-
-const { baseUrl, server } = await listen(createApp());
-test.after(() => server.close());
+const { baseUrl } = await startTestServer();
 
 test('register creates an account and sets a session cookie', async () => {
   const client = new TestClient(baseUrl);

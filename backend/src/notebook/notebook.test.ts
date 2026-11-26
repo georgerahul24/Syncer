@@ -1,37 +1,12 @@
-import { randomUUID } from 'node:crypto';
-import os from 'node:os';
 import path from 'node:path';
-import fs from 'node:fs';
-import { fileURLToPath } from 'node:url';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { startTestServer, TestClient, newUserWithBook } from '../test/helpers.js';
 
-process.env.DATA_DIR = path.join(os.tmpdir(), `syncer-test-${randomUUID()}`);
-
-const { createApp } = await import('../app.js');
-const { listen, TestClient } = await import('../test/helpers.js');
-
-const { baseUrl, server } = await listen(createApp());
-test.after(() => server.close());
-
-const fixturesDir = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'test', 'fixtures');
-const pdfBytes = fs.readFileSync(path.join(fixturesDir, 'sample.pdf'));
-
-async function newUserWithBook() {
-  const client = new TestClient(baseUrl);
-  await client.post('/api/auth/register', { email: `nb-${randomUUID()}@example.com`, password: 'correct-horse' });
-  const form = new FormData();
-  form.append('file', new Blob([pdfBytes]), 'book.pdf');
-  const uploadRes = await fetch(`${baseUrl}/api/books`, {
-    method: 'POST',
-    headers: { Cookie: client.cookieHeader! },
-    body: form,
-  });
-  return { client, book: await uploadRes.json() };
-}
+const { baseUrl } = await startTestServer();
 
 test('create, list, edit, and delete a notebook page', async () => {
-  const { client, book } = await newUserWithBook();
+  const { client, book } = await newUserWithBook(baseUrl);
 
   const createRes = await client.post(`/api/books/${book.id}/notebook-pages`, { afterPage: 1 });
   assert.equal(createRes.status, 201);
@@ -58,13 +33,13 @@ test('create, list, edit, and delete a notebook page', async () => {
 });
 
 test('rejects an invalid afterPage', async () => {
-  const { client, book } = await newUserWithBook();
+  const { client, book } = await newUserWithBook(baseUrl);
   const res = await client.post(`/api/books/${book.id}/notebook-pages`, { afterPage: -1 });
   assert.equal(res.status, 400);
 });
 
 test('creating an overlay for a page returns the same row instead of a duplicate', async () => {
-  const { client, book } = await newUserWithBook();
+  const { client, book } = await newUserWithBook(baseUrl);
   const strokeA = [{ color: '#000', width: 2, points: [{ x: 0, y: 0 }, { x: 0.1, y: 0.1 }] }];
 
   const first = await (await client.post(`/api/books/${book.id}/notebook-pages`, { overlayPage: 1, strokes: strokeA })).json();
@@ -86,17 +61,17 @@ test('creating an overlay for a page returns the same row instead of a duplicate
 });
 
 test('rejects a request with neither afterPage nor overlayPage', async () => {
-  const { client, book } = await newUserWithBook();
+  const { client, book } = await newUserWithBook(baseUrl);
   const res = await client.post(`/api/books/${book.id}/notebook-pages`, {});
   assert.equal(res.status, 400);
 });
 
 test('a user cannot read, edit, or delete another user\'s notebook page', async () => {
-  const { client: ownerClient, book } = await newUserWithBook();
+  const { client: ownerClient, book } = await newUserWithBook(baseUrl);
   const created = await (await ownerClient.post(`/api/books/${book.id}/notebook-pages`, { afterPage: 0 })).json();
 
   const otherClient = new TestClient(baseUrl);
-  await otherClient.post('/api/auth/register', { email: `nb-other-${randomUUID()}@example.com`, password: 'correct-horse' });
+  await otherClient.register();
 
   assert.equal((await otherClient.get(`/api/books/${book.id}/notebook-pages`)).status, 404);
   assert.equal((await otherClient.put(`/api/notebook-pages/${created.id}`, { text: 'x' })).status, 404);

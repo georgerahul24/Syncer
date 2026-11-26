@@ -7,11 +7,16 @@ import type { ReaderComponentProps } from '../types';
 import type { AnnotationColor, EpubAnnotationLocation, EpubLocation } from '../../types';
 import { registerThemes, applyTheme, applyTypography } from './themes';
 import { navItemsToToc } from './toc';
-import HighlightPopup, { COLOR_VAR } from './HighlightPopup';
+import HighlightPopup, { COLOR_VAR } from '../HighlightPopup';
 import EpubSearchOverlay from './EpubSearchOverlay';
 import { useReadingSessionTracker } from '../analytics/useReadingSessionTracker';
 import { clampPadding, useViewportSize } from '../padding';
-import { createWheelPager } from '../wheelPaging';
+import { createWheelPager, NEW_SWIPE_RATIO, wheelDeltaPx } from '../wheelPaging';
+import { readString, writeString } from '../../utils/storage';
+import { runWhenIdle } from '../../utils/idle';
+import { useDismissOnOutside } from '../../hooks/useDismissOnOutside';
+import { isTypingTarget, pageKeyDirection, swipeDirection } from '../input';
+import { sanitizeChapter } from './sanitize';
 import styles from './EpubReader.module.css';
 
 interface PendingSelection {
@@ -104,6 +109,31 @@ export default function EpubReader({
   const pendingEpubSelectionTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useReadingSessionTracker(book.id, progress);
+  useDismissOnOutside(popupRef, () => setSelection(null), !!selection);
+
+  // The scroller epub.js builds inside our container. It holds the current
+  // section, and it's what the chapter-crossing rubber band moves.
+  function scrollerEl(): HTMLElement | null {
+    return containerRef.current?.querySelector('.epub-container') as HTMLElement | null;
+  }
+
+  // Drops whatever offset/opacity the rubber band or a chapter reveal left
+  // on the scroller.
+  function clearPull(el: HTMLElement) {
+    el.style.transition = '';
+    el.style.transform = '';
+    el.style.opacity = '';
+    el.style.visibility = '';
+  }
+
+  // A user page turn in paginated mode: synced right away, not debounced.
+  function turnPage(direction: 1 | -1) {
+    const rendition = renditionRef.current;
+    if (!rendition) return;
+    discreteRef.current = true;
+    if (direction === 1) rendition.next();
+    else rendition.prev();
+  }
 
   function programmaticDisplay(rendition: Rendition, target?: string) {
     // A TOC jump or a remote sync can land mid-gesture; don't leave the
@@ -112,13 +142,8 @@ export default function EpubReader({
     // at — display() replaces the section outright, so any of those
     // in-flight inline styles would otherwise survive onto content they
     // were never meant to apply to.
-    const scroller = containerRef.current?.querySelector('.epub-container') as HTMLElement | null;
-    if (scroller) {
-      scroller.style.transition = '';
-      scroller.style.transform = '';
-      scroller.style.opacity = '';
-      scroller.style.visibility = '';
-    }
+    const scroller = scrollerEl();
+    if (scroller) clearPull(scroller);
     suppressRelocateRef.current = true;
     if (suppressTimerRef.current) clearTimeout(suppressTimerRef.current);
     suppressTimerRef.current = setTimeout(() => {
@@ -162,6 +187,10 @@ export default function EpubReader({
     // relative to the blob URL — all of which fail — and the book never
     // finishes opening, since that isn't a rejection epub.js surfaces.
     const epubBook = ePub(fileUrl, { openAs: 'epub' } as any); // eslint-disable-line @typescript-eslint/no-explicit-any
+    // Strip the book's own scripts before any chapter reaches its iframe.
+    // Registered right away: sections share the spine's hooks object, and
+    // the first chapter loads as soon as the rendition displays.
+    epubBook.spine.hooks.content.register((doc: Document) => sanitizeChapter(doc));
     epubBookRef.current = epubBook;
     setBookForSearch(epubBook);
 
@@ -183,12 +212,7 @@ export default function EpubReader({
     epubBook.ready
       .then(() => {
         if (cancelled) return;
-        let saved: string | null = null;
-        try {
-          saved = localStorage.getItem(locationsKey);
-        } catch {
-          // ignore
-        }
+        const saved = readString(locationsKey);
         if (saved) {
           epubBook.locations.load(saved);
           return;
@@ -198,17 +222,11 @@ export default function EpubReader({
             if (cancelled) return;
             epubBook.locations
               .generate(1600)
-              .then(() => {
-                try {
-                  localStorage.setItem(locationsKey, epubBook.locations.save());
-                } catch {
-                  // quota — it'll just be regenerated next time
-                }
-              })
+              // If the quota is full it's just regenerated next time.
+              .then(() => writeString(locationsKey, epubBook.locations.save()))
               .catch(() => {});
           };
-          if ('requestIdleCallback' in window) window.requestIdleCallback(run, { timeout: 5000 });
-          else run();
+          runWhenIdle(run, 5000);
         }, 3000);
       })
       .catch(() => {});
@@ -254,7 +272,12 @@ export default function EpubReader({
       // ourselves (see crossChapter below) costs a visible chapter break
       // but is deterministic and cannot fight the scroller.
       manager: 'default',
-      allowScriptedContent: false,
+      // Not because books may run scripts (they may not, see sanitize.ts,
+      // which strips them and blocks them with a CSP). WebKit, which the
+      // macOS app runs on, silently drops every event listener inside a
+      // sandboxed iframe without allow-scripts, including ours. Without
+      // this, the wheel, keys and touches inside the text do nothing there.
+      allowScriptedContent: true,
     });
     renditionRef.current = rendition;
     registerThemes(rendition);
@@ -345,17 +368,12 @@ export default function EpubReader({
       }, 300);
     });
 
-    // Dismiss the highlight-creation popup on a tap anywhere else — inside
-    // the book content (forwarded from whichever iframe is current) or
-    // outside it (chrome, nav zones). The popup itself renders in the main
-    // document, so a tap on it never reaches these handlers as "outside".
-    function dismissIfOutside(e: Event) {
-      if (popupRef.current && !popupRef.current.contains(e.target as Node)) setSelection(null);
-    }
-    rendition.on('mousedown', dismissIfOutside);
-    rendition.on('touchstart', dismissIfOutside);
-    window.addEventListener('mousedown', dismissIfOutside);
-    window.addEventListener('touchstart', dismissIfOutside, { passive: true });
+    // Dismiss the highlight-creation popup on a tap inside the book content
+    // (forwarded from whichever iframe is current). Taps outside it, on the
+    // chrome or nav zones, are handled by useDismissOnOutside below.
+    const dismissPopup = () => setSelection(null);
+    rendition.on('mousedown', dismissPopup);
+    rendition.on('touchstart', dismissPopup);
 
     // ------------------------------------------------------------------
     // Chapter chaining for scrolled mode (see the `manager` note above).
@@ -367,10 +385,6 @@ export default function EpubReader({
     // the top of a chapter (every jump does) can never bounce us into the
     // previous one, and so the reader can rest at either end.
     // ------------------------------------------------------------------
-    function scrollerEl(): HTMLElement | null {
-      return (containerRef.current?.querySelector('.epub-container') as HTMLElement | null) ?? null;
-    }
-
     // Crossing a chapter is a deliberate, visible step here rather than a
     // seamless stitch, so it gets a deliberate, visible transition: content
     // follows the finger past the edge against rising resistance, slides the
@@ -391,9 +405,8 @@ export default function EpubReader({
     // momentum of the scroll that got there, not a new intent to go further.
     const WHEEL_NEW_GESTURE_GAP_MS = 200;
     // A macOS trackpad swipe made while the last one's momentum is still
-    // running never leaves a gap. Momentum only ever shrinks, so a delta this
-    // many times bigger than the one before it is a new swipe starting.
-    const WHEEL_NEW_SWIPE_RATIO = 2.5;
+    // running never leaves a gap; NEW_SWIPE_RATIO (see wheelPaging.ts) spots
+    // the new swipe starting.
     // A lone event after a pause is a mouse wheel notch, which on a Mac can
     // be only a few pixels. Count each notch as at least this much, so a
     // handful of deliberate clicks gets there.
@@ -438,13 +451,6 @@ export default function EpubReader({
     function setPull(el: HTMLElement, y: number, ms: number) {
       el.style.transition = ms ? `transform ${ms}ms ${EASE}` : 'none';
       el.style.transform = `translateY(${y}px)`;
-    }
-
-    function clearPull(el: HTMLElement) {
-      el.style.transition = '';
-      el.style.transform = '';
-      el.style.opacity = '';
-      el.style.visibility = '';
     }
 
     // A section's iframe reports its height in stages as it lays out
@@ -600,8 +606,7 @@ export default function EpubReader({
       const now = performance.now();
       const gap = now - lastWheelAt;
       lastWheelAt = now;
-      // deltaMode 1 = lines (Firefox with a mouse wheel), 2 = pages.
-      const mag = Math.abs(e.deltaY) * (e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? el.clientHeight : 1);
+      const mag = wheelDeltaPx(e, e.deltaY, el.clientHeight);
       const prevMag = lastWheelMag;
       lastWheelMag = mag;
       const direction: 1 | -1 = e.deltaY > 0 ? 1 : -1;
@@ -622,7 +627,7 @@ export default function EpubReader({
       // Only a fresh gesture that starts while already resting at the edge
       // counts toward turning the chapter.
       if (!wheelArmed) {
-        const freshSwipe = mag >= 4 && mag > prevMag * WHEEL_NEW_SWIPE_RATIO;
+        const freshSwipe = mag >= 4 && mag > prevMag * NEW_SWIPE_RATIO;
         if (gap < WHEEL_NEW_GESTURE_GAP_MS && !freshSwipe) return;
         wheelArmed = true;
       }
@@ -644,13 +649,17 @@ export default function EpubReader({
     const wheelPager = createWheelPager((direction) => {
       if (renditionRef.current !== rendition) return;
       onActivity();
-      discreteRef.current = true;
-      if (direction === 1) rendition.next();
-      else rendition.prev();
+      turnPage(direction);
     });
-    // The margins and click zones around the book are outside its iframe.
-    const viewportEl = settings.mode === 'paginated' ? containerRef.current.parentElement : null;
-    viewportEl?.addEventListener('wheel', wheelPager.onWheel, { passive: true });
+    // Wheel over anything outside the chapter's iframe: the margins and
+    // click zones in paginated mode, and in scrolled mode the blank space
+    // under a chapter shorter than the screen (a title page, a dedication),
+    // where the iframe ends and the pointer is on our own page instead.
+    // Events inside the iframe never bubble out to here, so nothing is
+    // counted twice.
+    const viewportEl = containerRef.current.parentElement;
+    const onViewportWheel = (e: WheelEvent) => (settings.mode === 'paginated' ? wheelPager.onWheel(e) : onWheel(e));
+    viewportEl?.addEventListener('wheel', onViewportWheel, { passive: true });
 
     rendition.on('rendered', (_section: unknown, view: { document?: Document }) => {
       const doc = view?.document;
@@ -757,14 +766,8 @@ export default function EpubReader({
     // source), so this fires regardless of whether focus is on the outer
     // page or inside the currently-rendered chapter content.
     rendition.on('keydown', (e: KeyboardEvent) => {
-      if (settings.mode !== 'paginated') return;
-      if (e.key === 'ArrowRight' || e.key === 'PageDown') {
-        discreteRef.current = true;
-        rendition.next();
-      } else if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
-        discreteRef.current = true;
-        rendition.prev();
-      }
+      const direction = pageKeyDirection(e.key);
+      if (settings.mode === 'paginated' && direction) turnPage(direction);
     });
 
     // Touch swipe for paginated mode — epub.js does not turn pages on
@@ -775,16 +778,9 @@ export default function EpubReader({
     });
     rendition.on('touchend', (e: TouchEvent) => {
       if (touchStartX == null || settings.mode !== 'paginated') return;
-      const dx = (e.changedTouches[0]?.clientX ?? touchStartX) - touchStartX;
+      const direction = swipeDirection((e.changedTouches[0]?.clientX ?? touchStartX) - touchStartX);
       touchStartX = null;
-      const SWIPE_THRESHOLD = 40;
-      if (dx <= -SWIPE_THRESHOLD) {
-        discreteRef.current = true;
-        rendition.next();
-      } else if (dx >= SWIPE_THRESHOLD) {
-        discreteRef.current = true;
-        rendition.prev();
-      }
+      if (direction) turnPage(direction);
     });
 
     // epub.js re-reports the location 20ms after *every* scroll pause, and
@@ -826,11 +822,9 @@ export default function EpubReader({
       cancelled = true;
       clearTimeout(wheelReleaseTimer);
       wheelPager.dispose();
-      viewportEl?.removeEventListener('wheel', wheelPager.onWheel);
+      viewportEl?.removeEventListener('wheel', onViewportWheel);
       rendition.destroy();
       renditionRef.current = null;
-      window.removeEventListener('mousedown', dismissIfOutside);
-      window.removeEventListener('touchstart', dismissIfOutside);
       if (pendingEpubSelectionTimer.current) clearTimeout(pendingEpubSelectionTimer.current);
     };
     // `fileUrl` is in here even though this effect never reads it, and it's
@@ -869,7 +863,7 @@ export default function EpubReader({
   // ever move a whole chapter at a time, losing your place within it.
   useEffect(() => {
     if (!ready || settings.mode === 'paginated') return;
-    const el = containerRef.current?.querySelector('.epub-container') as HTMLElement | null;
+    const el = scrollerEl();
     const rendition = renditionRef.current;
     if (!el || !rendition) return;
     let timer: ReturnType<typeof setTimeout> | null = null;
@@ -880,10 +874,7 @@ export default function EpubReader({
       // Recompute once the scroll has properly settled, and in idle time —
       // the CFI lookup walks the rendered section, and doing it mid-scroll
       // is a dropped frame.
-      timer = setTimeout(() => {
-        if ('requestIdleCallback' in window) window.requestIdleCallback(report, { timeout: 500 });
-        else report();
-      }, 300);
+      timer = setTimeout(() => runWhenIdle(report, 500), 300);
     };
     el.addEventListener('scroll', onScroll, { passive: true });
     return () => {
@@ -964,16 +955,8 @@ export default function EpubReader({
   // in a text input (the search box) so arrow keys type normally there.
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
-      const tag = (e.target as HTMLElement | null)?.tagName;
-      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
-      if (settings.mode !== 'paginated' || !renditionRef.current) return;
-      if (e.key === 'ArrowRight' || e.key === 'PageDown') {
-        discreteRef.current = true;
-        renditionRef.current.next();
-      } else if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
-        discreteRef.current = true;
-        renditionRef.current.prev();
-      }
+      const direction = pageKeyDirection(e.key);
+      if (settings.mode === 'paginated' && direction && !isTypingTarget(e.target)) turnPage(direction);
     }
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
@@ -1049,8 +1032,7 @@ export default function EpubReader({
               aria-label="Previous page"
               onClick={() => {
                 onActivity();
-                discreteRef.current = true;
-                renditionRef.current?.prev();
+                turnPage(-1);
               }}
             />
             <button
@@ -1059,8 +1041,7 @@ export default function EpubReader({
               aria-label="Next page"
               onClick={() => {
                 onActivity();
-                discreteRef.current = true;
-                renditionRef.current?.next();
+                turnPage(1);
               }}
             />
           </>

@@ -6,10 +6,12 @@ import { randomUUID } from 'node:crypto';
 import { db } from '../database/db.js';
 import { requireAuth } from '../middleware/auth.js';
 import { AppError, asyncRoute } from '../middleware/errors.js';
+import { requireEnabledFlag } from '../middleware/validate.js';
 import { DATA_DIR, MAX_UPLOAD_BYTES } from '../config.js';
 import { bookFilePath, deleteBookDir, streamFile } from '../storage/fileStorage.js';
 import { createBookFromUpload } from './createBook.js';
-import { getOwnedBook, type BookRow } from './access.js';
+import { getOwnedBook, getOwnedRow, type BookRow } from './access.js';
+import { getReadingProgress } from '../sync/hub.js';
 import { deleteBookTextIndex, reindexTxtContent } from '../search/textIndex.js';
 
 export const booksRouter = Router();
@@ -107,11 +109,8 @@ booksRouter.get(
       books = db.prepare(`SELECT * FROM books WHERE userId = ? ORDER BY createdAt DESC`).all(req.userId) as BookRow[];
     }
 
-    const progressStmt = db.prepare(
-      `SELECT progress, updatedAt FROM reading_progress WHERE userId = ? AND bookId = ?`
-    );
     const tagsByBook = getTagsByBook(books.map((b) => b.id));
-    res.json(books.map((b) => toDto(b, progressStmt.get(req.userId, b.id) as any, tagsByBook.get(b.id) ?? [])));
+    res.json(books.map((b) => toDto(b, getReadingProgress(req.userId!, b.id), tagsByBook.get(b.id) ?? [])));
   })
 );
 
@@ -130,11 +129,8 @@ booksRouter.get(
   '/:id',
   asyncRoute(async (req, res) => {
     const book = getOwnedBook(req.userId!, req.params.id);
-    const progress = db
-      .prepare(`SELECT progress, updatedAt FROM reading_progress WHERE userId = ? AND bookId = ?`)
-      .get(req.userId, book.id) as any;
     const tags = getTagsByBook([book.id]).get(book.id) ?? [];
-    res.json(toDto(book, progress, tags));
+    res.json(toDto(book, getReadingProgress(req.userId!, book.id), tags));
   })
 );
 
@@ -187,8 +183,7 @@ booksRouter.put(
   '/:id/sync',
   asyncRoute(async (req, res) => {
     const book = getOwnedBook(req.userId!, req.params.id);
-    const { enabled } = req.body ?? {};
-    if (typeof enabled !== 'boolean') throw new AppError(400, 'enabled must be a boolean');
+    const enabled = requireEnabledFlag(req.body);
     db.prepare(`UPDATE books SET syncEnabled = ? WHERE id = ?`).run(enabled ? 1 : 0, book.id);
     res.json({ syncEnabled: enabled });
   })
@@ -202,12 +197,7 @@ booksRouter.put(
     if (folderId !== null && typeof folderId !== 'string') {
       throw new AppError(400, 'folderId must be a string or null');
     }
-    if (folderId !== null) {
-      const folder = db.prepare(`SELECT userId FROM folders WHERE id = ?`).get(folderId) as
-        | { userId: string }
-        | undefined;
-      if (!folder || folder.userId !== req.userId) throw new AppError(404, 'Folder not found');
-    }
+    if (folderId !== null) getOwnedRow('folders', folderId, req.userId!, 'Folder');
     db.prepare(`UPDATE books SET folderId = ? WHERE id = ?`).run(folderId, book.id);
     res.json({ folderId });
   })

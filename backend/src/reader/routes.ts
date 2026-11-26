@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { requireAuth } from '../middleware/auth.js';
 import { AppError, asyncRoute } from '../middleware/errors.js';
 import { getOwnedBook } from '../books/access.js';
-import { applyLocalProgress, broadcastProgress, getReadingProgress, getSyncFlags } from '../sync/hub.js';
+import { applyLocalProgress, broadcastProgress, getReadingProgress, isSyncEnabled, progressToDto } from '../sync/hub.js';
 
 export const readerRouter = Router();
 readerRouter.use(requireAuth);
@@ -13,17 +13,7 @@ readerRouter.get(
   asyncRoute(async (req, res) => {
     const book = getOwnedBook(req.userId!, req.params.id);
     const row = getReadingProgress(req.userId!, book.id);
-    if (!row) {
-      res.json(null);
-      return;
-    }
-    res.json({
-      locationType: row.locationType,
-      location: JSON.parse(row.location),
-      progress: row.progress,
-      revision: row.revision,
-      updatedAt: row.updatedAt,
-    });
+    res.json(row ? progressToDto(row) : null);
   })
 );
 
@@ -43,9 +33,7 @@ const saveProgress = asyncRoute(async (req, res) => {
     throw new AppError(400, 'locationType, location and progress are required');
   }
 
-  const flags = getSyncFlags(req.userId!, book.id);
-  const effective = !!flags?.userSyncEnabled && !!flags?.bookSyncEnabled;
-  if (!effective) {
+  if (!isSyncEnabled(req.userId!, book.id)) {
     res.status(202).json({ shared: false });
     return;
   }

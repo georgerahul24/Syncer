@@ -1,16 +1,8 @@
-import { randomUUID } from 'node:crypto';
-import os from 'node:os';
-import path from 'node:path';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { startTestServer, TestClient } from '../test/helpers.js';
 
-process.env.DATA_DIR = path.join(os.tmpdir(), `syncer-test-${randomUUID()}`);
-
-const { createApp } = await import('../app.js');
-const { listen, TestClient } = await import('../test/helpers.js');
-
-const { baseUrl, server } = await listen(createApp());
-test.after(() => server.close());
+const { baseUrl } = await startTestServer();
 
 test('another website cannot call the API', async () => {
   const client = new TestClient(baseUrl);

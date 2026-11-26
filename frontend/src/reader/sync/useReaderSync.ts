@@ -4,6 +4,7 @@ import { progress as progressApi } from '../../services/api';
 import { getApiBase } from '../../services/serverConfig';
 import { getStoredToken } from '../../services/authToken';
 import type { ClientMessage, ServerMessage } from './protocol';
+import { readJSON, writeJSON } from '../../utils/storage';
 
 // ============================================================================
 // LOOP-PREVENTION INVARIANT — read this before touching this file.
@@ -56,22 +57,8 @@ interface CachedPosition {
   revision?: number;
 }
 
-function readCache(bookId: string): CachedPosition | null {
-  try {
-    const raw = localStorage.getItem(localCacheKey(bookId));
-    return raw ? JSON.parse(raw) : null;
-  } catch {
-    return null;
-  }
-}
-
-function writeCache(bookId: string, pos: CachedPosition): void {
-  try {
-    localStorage.setItem(localCacheKey(bookId), JSON.stringify(pos));
-  } catch {
-    // best-effort only
-  }
-}
+const readCache = (bookId: string) => readJSON<CachedPosition>(localCacheKey(bookId));
+const writeCache = (bookId: string, pos: CachedPosition) => writeJSON(localCacheKey(bookId), pos);
 
 export interface RemoteUpdate {
   revision: number;

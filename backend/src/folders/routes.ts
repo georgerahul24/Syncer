@@ -2,7 +2,9 @@ import { Router } from 'express';
 import { randomUUID } from 'node:crypto';
 import { db } from '../database/db.js';
 import { requireAuth } from '../middleware/auth.js';
-import { AppError, asyncRoute } from '../middleware/errors.js';
+import { asyncRoute } from '../middleware/errors.js';
+import { requireName } from '../middleware/validate.js';
+import { getOwnedRow } from '../books/access.js';
 
 export const foldersRouter = Router();
 foldersRouter.use(requireAuth);
@@ -14,11 +16,7 @@ interface FolderRow {
   createdAt: string;
 }
 
-function getOwnedFolder(userId: string, id: string): FolderRow {
-  const row = db.prepare(`SELECT * FROM folders WHERE id = ?`).get(id) as FolderRow | undefined;
-  if (!row || row.userId !== userId) throw new AppError(404, 'Folder not found');
-  return row;
-}
+const getOwnedFolder = (userId: string, id: string) => getOwnedRow<FolderRow>('folders', id, userId, 'Folder');
 
 function toDto(row: FolderRow, bookCount: number) {
   return { id: row.id, name: row.name, createdAt: row.createdAt, bookCount };
@@ -40,9 +38,7 @@ foldersRouter.get(
 foldersRouter.post(
   '/',
   asyncRoute(async (req, res) => {
-    const name = String(req.body?.name ?? '').trim();
-    if (!name) throw new AppError(400, 'Folder name is required');
-    if (name.length > 100) throw new AppError(400, 'Folder name is too long');
+    const name = requireName(req.body?.name, 'Folder', 100);
     const id = randomUUID();
     const now = new Date().toISOString();
     db.prepare(`INSERT INTO folders (id, userId, name, createdAt) VALUES (?, ?, ?, ?)`).run(id, req.userId, name, now);
@@ -54,9 +50,7 @@ foldersRouter.put(
   '/:id',
   asyncRoute(async (req, res) => {
     const folder = getOwnedFolder(req.userId!, req.params.id);
-    const name = String(req.body?.name ?? '').trim();
-    if (!name) throw new AppError(400, 'Folder name is required');
-    if (name.length > 100) throw new AppError(400, 'Folder name is too long');
+    const name = requireName(req.body?.name, 'Folder', 100);
     db.prepare(`UPDATE folders SET name = ? WHERE id = ?`).run(name, folder.id);
     const bookCount = (db.prepare(`SELECT COUNT(*) AS c FROM books WHERE folderId = ?`).get(folder.id) as { c: number }).c;
     res.json(toDto({ ...folder, name }, bookCount));

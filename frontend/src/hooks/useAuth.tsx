@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useState, type React
 import type { User } from '../types';
 import { ApiError } from '../services/api';
 import { auth as authApi } from '../services/api';
+import { readJSON, writeJSON } from '../utils/storage';
 
 interface AuthContextValue {
   user: User | null;
@@ -18,23 +19,8 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 
 const CACHED_USER_KEY = 'syncer:cached-user';
 
-function readCachedUser(): User | null {
-  try {
-    const raw = localStorage.getItem(CACHED_USER_KEY);
-    return raw ? (JSON.parse(raw) as User) : null;
-  } catch {
-    return null;
-  }
-}
-
-function writeCachedUser(user: User | null): void {
-  try {
-    if (user) localStorage.setItem(CACHED_USER_KEY, JSON.stringify(user));
-    else localStorage.removeItem(CACHED_USER_KEY);
-  } catch {
-    // best-effort only
-  }
-}
+const readCachedUser = () => readJSON<User>(CACHED_USER_KEY);
+const writeCachedUser = (user: User | null) => writeJSON(CACHED_USER_KEY, user);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   // A device that was signed in last time opens straight into the app with

@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
-import type { InkStroke, NotebookPage } from '../../types';
+import type { InkStroke, NotebookLocation, NotebookPage } from '../../types';
 import { notebookPages as notebookPagesApi } from '../../services/api';
 import { enqueue, isNetworkError } from '../../services/offlineQueue';
 import type { NotebookRemoteEvent } from '../sync/useReaderSync';
+import { mergeRemoteUpsert } from '../sync/mergeRemote';
 
 let tmpCounter = 0;
 
-export type NotebookLocation = { afterPage: number } | { overlayPage: number };
 
 /**
  * Same optimistic create/update/delete + offline-queue pattern as
@@ -29,16 +29,7 @@ export function useNotebookPages(bookId: string, remoteEvent?: NotebookRemoteEve
     if (!remoteEvent) return;
     if (remoteEvent.kind === 'upsert' && remoteEvent.page) {
       const incoming = remoteEvent.page;
-      setPages((prev) => {
-        const local = prev.find((p) => p.id === incoming.id);
-        // A broadcast can be this same session's own save echoing back
-        // after the user has already drawn a further stroke locally (fired
-        // optimistically, still in flight) — updatedAt tells us which is
-        // newer, so a slow echo of an older save can't stomp a newer local
-        // stroke that just hasn't reached the server yet.
-        if (local && local.updatedAt > incoming.updatedAt) return prev;
-        return local ? prev.map((p) => (p.id === incoming.id ? incoming : p)) : [...prev, incoming];
-      });
+      setPages((prev) => mergeRemoteUpsert(prev, incoming));
     } else if (remoteEvent.kind === 'delete' && remoteEvent.pageId) {
       const id = remoteEvent.pageId;
       setPages((prev) => prev.filter((p) => p.id !== id));

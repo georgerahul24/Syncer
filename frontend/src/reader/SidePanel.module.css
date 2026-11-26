@@ -1,0 +1,62 @@
+/* Solid side sheet shared by the contents and annotations panels. Slides
+   with transform only; no blur over the page. Each panel adds its own
+   width and header padding. .panelOpen comes last so it wins over the
+   hidden offset of .left/.right. */
+.panel {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  background: var(--color-surface);
+  box-shadow: var(--shadow-lg);
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  visibility: hidden;
+  transition:
+    transform var(--transition-spring),
+    visibility 0s linear var(--duration-slow);
+}
+
+.left {
+  left: 0;
+  border-right: 1px solid var(--color-border);
+  transform: translateX(-100%);
+}
+
+.right {
+  right: 0;
+  border-left: 1px solid var(--color-border);
+  transform: translateX(100%);
+}
+
+.panelOpen {
+  transform: translateX(0);
+  visibility: visible;
+  transition:
+    transform var(--transition-spring),
+    visibility 0s;
+}
+
+.headerTitle {
+  font-family: var(--font-serif);
+  font-size: var(--text-md);
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.closeButton {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+  color: var(--color-text-secondary);
+  transition: background-color var(--transition-fast);
+}
+
+.closeButton:hover {
+  background: var(--color-hover);
+  color: var(--color-text);
+}

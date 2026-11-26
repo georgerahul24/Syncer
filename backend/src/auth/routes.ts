@@ -10,6 +10,7 @@ import {
   clearSessionCookie,
 } from './sessions.js';
 import { AppError, asyncRoute } from '../middleware/errors.js';
+import { requireCredentials, requireEnabledFlag } from '../middleware/validate.js';
 import { requireAuth } from '../middleware/auth.js';
 import { ALLOW_REGISTRATION } from '../config.js';
 import { rateLimit } from '../middleware/rateLimit.js';
@@ -40,11 +41,7 @@ authRouter.post(
   '/register',
   registerLimiter,
   asyncRoute(async (req, res) => {
-    const { email, password } = req.body ?? {};
-    if (typeof email !== 'string' || typeof password !== 'string') {
-      throw new AppError(400, 'Email and password are required');
-    }
-    const normalizedEmail = email.trim().toLowerCase();
+    const { email: normalizedEmail, password } = requireCredentials(req.body);
     if (!EMAIL_RE.test(normalizedEmail)) throw new AppError(400, 'Enter a valid email address');
     if (password.length < 8) throw new AppError(400, 'Password must be at least 8 characters');
 
@@ -74,11 +71,7 @@ authRouter.post(
   '/login',
   loginLimiter,
   asyncRoute(async (req, res) => {
-    const { email, password } = req.body ?? {};
-    if (typeof email !== 'string' || typeof password !== 'string') {
-      throw new AppError(400, 'Email and password are required');
-    }
-    const normalizedEmail = email.trim().toLowerCase();
+    const { email: normalizedEmail, password } = requireCredentials(req.body);
     const user = db.prepare(`SELECT * FROM users WHERE email = ?`).get(normalizedEmail) as
       | UserRow
       | undefined;
@@ -109,8 +102,7 @@ authRouter.put(
   '/me/sync',
   requireAuth,
   asyncRoute(async (req, res) => {
-    const { enabled } = req.body ?? {};
-    if (typeof enabled !== 'boolean') throw new AppError(400, 'enabled must be a boolean');
+    const enabled = requireEnabledFlag(req.body);
     db.prepare(`UPDATE users SET syncEnabled = ? WHERE id = ?`).run(enabled ? 1 : 0, req.userId);
     res.json({ syncEnabled: enabled });
   })

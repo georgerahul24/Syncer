@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { useRouter } from '../router';
 import { search as searchApi } from '../services/api';
 import type { SearchResult } from '../types';
 import styles from './LibrarySearchBar.module.css';
+import { useDismissOnOutside } from '../hooks/useDismissOnOutside';
 
 const DEBOUNCE_MS = 250;
 
@@ -31,13 +32,7 @@ export default function LibrarySearchBar() {
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const requestIdRef = useRef(0);
 
-  useEffect(() => {
-    function onMouseDown(e: MouseEvent) {
-      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false);
-    }
-    window.addEventListener('mousedown', onMouseDown);
-    return () => window.removeEventListener('mousedown', onMouseDown);
-  }, []);
+  useDismissOnOutside(wrapRef, () => setOpen(false));
 
   function onQueryChange(value: string) {
     setQuery(value);

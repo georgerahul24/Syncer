@@ -23,7 +23,6 @@ export const PORT = Number(process.env.PORT) || 3001;
 // (see README, "Installing on your phone"). Both must be set, or neither.
 export const TLS_CERT_FILE = process.env.TLS_CERT_FILE || '';
 export const TLS_KEY_FILE = process.env.TLS_KEY_FILE || '';
-export const NODE_ENV = process.env.NODE_ENV || 'development';
 
 export const MAX_UPLOAD_BYTES = 500 * 1024 * 1024; // 500MB
 export const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days

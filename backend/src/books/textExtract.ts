@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import AdmZip from 'adm-zip';
-import { XMLParser } from 'fast-xml-parser';
+import { resolveRelative, toArray, withPdfDocument, xmlParser } from './parseUtil.js';
 
 export interface ExtractedTextChunk {
   page: number; // 1-based PDF page, or 1-based spine position for EPUB; always 1 for txt
@@ -24,10 +24,7 @@ export function extractTxtText(filePath: string): ExtractedTextChunk[] {
 
 /** Per-page plain text, using the same PDF.js Node build as pdfMetadata.ts. */
 export async function extractPdfText(filePath: string): Promise<ExtractedTextChunk[]> {
-  const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
-  const data = new Uint8Array(fs.readFileSync(filePath));
-  const doc = await pdfjs.getDocument({ data, isEvalSupported: false }).promise;
-  try {
+  return withPdfDocument(filePath, async (doc) => {
     const chunks: ExtractedTextChunk[] = [];
     for (let i = 1; i <= doc.numPages; i++) {
       const page = await doc.getPage(i);
@@ -40,28 +37,12 @@ export async function extractPdfText(filePath: string): Promise<ExtractedTextChu
       if (text) chunks.push({ page: i, locationType: 'pdf-page', location: { page: i }, text });
     }
     return chunks;
-  } finally {
-    await doc.destroy();
-  }
+  });
 }
 
-// A small, self-contained EPUB spine/opf parser rather than reusing
-// epubMetadata.ts's internals — that module's parsing is already tested
-// against real-world EPUBs for the (much higher-stakes) upload-validation
-// path, and duplicating ~20 lines here is cheaper than risking a shared
-// refactor of that code.
-const xmlParser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '@_', removeNSPrefix: true });
-
-function toArray<T>(value: T | T[] | undefined): T[] {
-  if (value === undefined) return [];
-  return Array.isArray(value) ? value : [value];
-}
-
-function resolveRelative(baseDir: string, href: string): string {
-  const clean = href.split('#')[0];
-  const joined = baseDir ? `${baseDir}/${clean}` : clean;
-  return path.posix.normalize(joined).replace(/^(\.\.\/)+/, '');
-}
+// The EPUB spine/opf walk below stays separate from epubMetadata.ts's on
+// purpose: that one is tested against real-world EPUBs for the
+// higher-stakes upload-validation path. Only the pure helpers are shared.
 
 function htmlToText(html: string): string {
   return html

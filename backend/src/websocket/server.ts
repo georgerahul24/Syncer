@@ -9,7 +9,8 @@ import {
   applyLocalProgress,
   broadcastProgress,
   getReadingProgress,
-  getSyncFlags,
+  isSessionSyncEnabled,
+  isSyncEnabled,
   registerSession,
   setSessionSyncEnabled,
   touchSession,
@@ -86,8 +87,7 @@ export function attachWebSocketServer(httpServer: HttpServer | HttpsServer): Web
     // entirely client-driven from here on via `sync-toggle`.
     registerSession(sessionId, ws, userId, bookId, true);
 
-    const flags = getSyncFlags(userId, bookId);
-    const effectiveSync = !!flags?.userSyncEnabled && !!flags?.bookSyncEnabled;
+    const effectiveSync = isSyncEnabled(userId, bookId);
     const progress = getReadingProgress(userId, bookId);
 
     send(ws, {
@@ -154,12 +154,7 @@ function handleMessage(ws: WebSocket, state: SocketState, msg: ClientMessage): v
       return;
 
     case 'position': {
-      const flags = getSyncFlags(state.userId, state.bookId);
-      const sessionRow = db
-        .prepare(`SELECT syncEnabled FROM reader_sessions WHERE id = ?`)
-        .get(state.sessionId) as { syncEnabled: number } | undefined;
-      const effective = !!flags?.userSyncEnabled && !!flags?.bookSyncEnabled && !!sessionRow?.syncEnabled;
-      if (!effective) {
+      if (!isSyncEnabled(state.userId, state.bookId) || !isSessionSyncEnabled(state.sessionId)) {
         send(ws, { type: 'error', message: 'Sync is disabled; position was not shared with other sessions' });
         return;
       }

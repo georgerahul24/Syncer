@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { ReaderSettings } from '../types';
+import { readJSON, writeJSON } from '../utils/storage';
 
 const STORAGE_KEY = 'syncer:reader-settings:v1';
 
-export const DEFAULT_READER_SETTINGS: ReaderSettings = {
+const DEFAULT_READER_SETTINGS: ReaderSettings = {
   theme: 'light',
   fontFamily: 'georgia',
   fontSize: 18,
@@ -14,13 +15,7 @@ export const DEFAULT_READER_SETTINGS: ReaderSettings = {
 };
 
 function load(): ReaderSettings {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return DEFAULT_READER_SETTINGS;
-    return { ...DEFAULT_READER_SETTINGS, ...JSON.parse(raw) };
-  } catch {
-    return DEFAULT_READER_SETTINGS;
-  }
+  return { ...DEFAULT_READER_SETTINGS, ...readJSON<Partial<ReaderSettings>>(STORAGE_KEY) };
 }
 
 /**
@@ -33,11 +28,7 @@ export function useReaderSettings() {
   const [settings, setSettings] = useState<ReaderSettings>(load);
 
   useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
-    } catch {
-      // best-effort
-    }
+    writeJSON(STORAGE_KEY, settings);
   }, [settings]);
 
   const update = useCallback((patch: Partial<ReaderSettings>) => {

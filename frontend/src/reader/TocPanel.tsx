@@ -1,5 +1,6 @@
 import type { TocItem } from '../types';
 import styles from './TocPanel.module.css';
+import sheet from './SidePanel.module.css';
 
 function Rows({ items, depth, onSelect }: { items: TocItem[]; depth: number; onSelect: (item: TocItem) => void }) {
   return (
@@ -28,10 +29,10 @@ export default function TocPanel({
   onSelect: (item: TocItem) => void;
 }) {
   return (
-    <aside className={`${styles.panel} ${open ? styles.panelOpen : ''}`} aria-hidden={!open}>
+    <aside className={`${sheet.panel} ${sheet.left} ${styles.panel} ${open ? sheet.panelOpen : ''}`} aria-hidden={!open}>
       <div className={styles.header}>
-        <span className={styles.headerTitle}>Contents</span>
-        <button type="button" className={styles.closeButton} onClick={onClose} aria-label="Close table of contents">
+        <span className={sheet.headerTitle}>Contents</span>
+        <button type="button" className={sheet.closeButton} onClick={onClose} aria-label="Close table of contents">
           ✕
         </button>
       </div>

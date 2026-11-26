@@ -3,6 +3,7 @@ import path from 'node:path';
 import { createHash } from 'node:crypto';
 import type { Response } from 'express';
 import { LIBRARY_DIR } from '../config.js';
+import type { BookFormat } from '../books/access.js';
 
 // Every path here is built exclusively from server-generated UUIDs
 // (userId, bookId) plus a fixed, allow-listed extension — never from a
@@ -26,7 +27,7 @@ export function ensureBookDir(userId: string, bookId: string): string {
   return dir;
 }
 
-export function bookFilePath(userId: string, bookId: string, format: 'pdf' | 'epub' | 'txt'): string {
+export function bookFilePath(userId: string, bookId: string, format: BookFormat): string {
   return path.join(bookDir(userId, bookId), `book.${format}`);
 }
 
